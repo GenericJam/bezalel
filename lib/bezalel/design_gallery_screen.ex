@@ -31,6 +31,10 @@ defmodule Bezalel.DesignGalleryScreen do
 
   def mount(_params, _session, socket) do
     Mob.Theme.AdaptiveWatcher.register_adaptive(MobBezalel.System)
+    # In System mode the screen re-resolves the theme itself on an OS flip:
+    # the watcher updates the theme but doesn't repaint a screen that's
+    # already showing, and a repaint racing it could keep the old palette.
+    Mob.Device.subscribe(:appearance)
     mode = Mob.State.get(:bezalel_mode, :dark)
     Mob.Theme.set(Keyword.fetch!(@modes, mode))
 
@@ -112,6 +116,13 @@ defmodule Bezalel.DesignGalleryScreen do
       </Sheet>
     </Column>
     """
+  end
+
+  # The repaint after handle_info picks up the new theme: the frame
+  # fingerprint covers Mob.Theme.current(), so an unchanged tree still paints.
+  def handle_info({:mob_device, :color_scheme_changed, _scheme}, socket) do
+    if socket.assigns.mode == :system, do: Mob.Theme.set(MobBezalel.System)
+    {:noreply, socket}
   end
 
   def handle_info({:tap, {:mode, mode}}, socket) do
