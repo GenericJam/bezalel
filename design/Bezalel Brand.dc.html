@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;family=Frank+Ruhl+Libre:wght@400;500&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E6DECF;font-family:'Instrument Sans',system-ui,sans-serif;color:#1E1A16}a{color:#8A5A2B}a:hover{color:#4A1F1A}.dv-turn{padding:44px 48px 40px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 22px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1E1A16;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 'Instrument Sans',sans-serif;color:#1E1A16}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1E1A16;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 'Instrument Sans',sans-serif;color:rgba(0,0,0,.55)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#8A5A2B;color:#fff}.dv-next{margin:24px 0 0;font:12px/1.5 'Instrument Sans',sans-serif;color:rgba(0,0,0,.5)}</style>
+</helmet>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4DC98"></stop><stop offset=".42" stop-color="#C9A04A"></stop><stop offset=".7" stop-color="#8F6A25"></stop><stop offset="1" stop-color="#E3C277"></stop></linearGradient>
+<radialGradient id="sheen" cx=".32" cy=".22" r="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"></stop><stop offset=".55" stop-color="#fff" stop-opacity="0"></stop><stop offset="1" stop-color="#000" stop-opacity=".45"></stop></radialGradient>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".42" numOctaves="3" seed="7"></feTurbulence><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.6 0 0 0 -0.55"></feColorMatrix><feComposite in2="SourceGraphic" operator="in"></feComposite></filter>
+<filter id="emboss" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="1" stdDeviation=".6" flood-color="#000" flood-opacity=".6"></feDropShadow></filter>
+<symbol id="m-lamp" viewBox="0 0 100 100"><path fill-rule="evenodd" d="M50 14C55.5 24 61 31 61 39.5C61 47 56 52 50 52C44 52 39 47 39 39.5C39 31 44.5 24 50 14ZM50 31C52.6 36 55 39.5 55 42.5C55 45.6 52.8 47.6 50 47.6C47.2 47.6 45 45.6 45 42.5C45 39.5 47.4 36 50 31Z"></path><path d="M12 58C30 63.5 70 63.5 88 58C86 73 70 84 50 84C30 84 14 73 12 58Z"></path></symbol>
+<symbol id="m-blade" viewBox="0 0 100 100"><path fill-rule="evenodd" d="M50 10L58 27L58 68L42 68L42 27ZM48.8 30L51.2 30L51.2 63L48.8 63Z"></path><path d="M46 69C36 62.5 24 62 12 65.5L12 84C24 80.5 36 81 46 87.5Z"></path><path d="M54 69C64 62.5 76 62 88 65.5L88 84C76 80.5 64 81 54 87.5Z"></path></symbol>
+<symbol id="m-pa" viewBox="0 0 100 100"><path d="M49.2 0H50.8V21H49.2Z"></path><path d="M44 21H56V28H44Z"></path><path fill-rule="evenodd" d="M50 92L31 51C29 41 35 33 44 30L56 30C65 33 71 41 69 51ZM50 38C54 44 56.5 47.5 56.5 51.5C56.5 55.5 53.5 58 50 58C46.5 58 43.5 55.5 43.5 51.5C43.5 47.5 46 44 50 38ZM49.1 61H50.9V87H49.1Z"></path></symbol>
+<symbol id="m-pb" viewBox="0 0 100 100"><path d="M49.2 0H50.8V13H49.2Z"></path><path fill-rule="evenodd" d="M50 92L30 53C28 36 37 22 50 12C63 22 72 36 70 53ZM50 33C54 39 56.5 42.5 56.5 46.5C56.5 50.5 53.5 53 50 53C46.5 53 43.5 50.5 43.5 46.5C43.5 42.5 46 39 50 33ZM49.1 56H50.9V87H49.1Z"></path></symbol>
+<symbol id="m-pc" viewBox="0 0 100 100"><path d="M49.2 0H50.8V15H49.2Z"></path><path fill-rule="evenodd" d="M55.5 20A5.5 5.5 0 1 0 44.5 20A5.5 5.5 0 1 0 55.5 20ZM52.5 20A2.5 2.5 0 1 0 47.5 20A2.5 2.5 0 1 0 52.5 20Z"></path><path fill-rule="evenodd" d="M50 92L30 52C29 40 37 30 50 29C63 30 71 40 70 52ZM50 37C54.5 43 57 47 57 51C57 54.5 54.8 57 51 57.8L51 87L49 87L49 57.8C45.2 57 43 54.5 43 51C43 47 45.5 43 50 37Z"></path></symbol>
+<symbol id="m-nib" viewBox="0 0 100 100"><path fill-rule="evenodd" d="M50 90L30 53C28 36 37 22 50 10C63 22 72 36 70 53ZM55.5 45A5.5 5.5 0 1 0 44.5 45A5.5 5.5 0 1 0 55.5 45ZM49.1 51.5L50.9 51.5L50.9 86L49.1 86Z"></path></symbol>
+</defs>
+</svg>
+
+<section class="dv-turn" id="t2" data-screen-label="Nib · plumb bob · Spirit">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Riffs on <a class="dv-oid" href="#1c">1c</a>: nib + plumb bob + Spirit, set in the <a class="dv-oid" href="#1a">1a</a> lettering</span></div>
+<div style="font:400 22px/1.4 'EB Garamond',serif;color:#3E352B;margin:0 0 26px;max-width:900px;text-wrap:pretty">One silhouette, three readings. The scribe's <em>nib</em> stands for the Word written. The <em>plumb bob</em> on its line is the craftsman's true measure (Amos 7:7). The <em>tongue of flame</em> cut through it is the Spirit that filled Bezalel with skill (Ex 31:3; Acts 2:3).</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Bob-first — collar, shouldered body, flame breather<span style="font:600 10px 'Instrument Sans';letter-spacing:.12em;padding:3px 8px;border-radius:999px;background:#3B2A1E;color:#E3C277">CHOSEN</span></div>
+<div class="dv-card" style="width:500px">
+<div style="background:#E9E0CE;padding:26px;display:flex;gap:24px;align-items:center">
+<svg width="170" height="170" viewBox="0 0 100 100" style="display:block;flex:none;filter:drop-shadow(0 8px 18px rgba(30,20,10,.35))"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect width="100" height="100" rx="22.4" fill="#000" opacity="{{ grainOpacity }}" filter="url(#grain)"></rect><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity="{{ stitchOpacity }}" stroke-width=".9" stroke-dasharray="2.4 1.7"></rect><rect x="49.4" y="0" width="1.2" height="14" fill="#C9A04A"></rect><use href="#m-pa" x="14" y="13" width="72" height="72" fill="{{ markFill }}" filter="url(#emboss)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ smallSizes }}" as="s" hint-placeholder-count="1"><div style="display:flex;gap:12px;align-items:flex-end;padding:12px 14px;border-radius:14px;background:{{ s.bg }}">
+<svg width="60" height="60" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect x="49.2" y="0" width="1.6" height="12" fill="#C9A04A"></rect><use href="#m-pa" x="12" y="11" width="76" height="76" fill="{{ markFill }}"></use></svg>
+<svg width="40" height="40" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-pa" x="10" y="8" width="80" height="80" fill="{{ markFill }}"></use></svg>
+<svg width="29" height="29" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-pa" x="8" y="6" width="84" height="84" fill="#D9B566"></use></svg>
+<svg width="20" height="20" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-pa" x="6" y="4" width="88" height="88" fill="#D9B566"></use></svg>
+</div></sc-for>
+<div style="font:400 11px/1.4 'Instrument Sans';color:#6B5E4E">The collar is what says "plumb bob", and it holds at 20pt even after the line disappears.</div>
+</div>
+</div>
+<div style="background:#F3ECDD;padding:24px 28px;display:flex;align-items:center;gap:14px">
+<svg width="46" height="46" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="#8A5A2B"></use></svg>
+<div style="display:flex;flex-direction:column;gap:2px"><div style="font:500 42px/1 'EB Garamond',serif;letter-spacing:.005em">Bezalel</div><div dir="rtl" style="font:400 15px/1.2 'Frank Ruhl Libre',serif;color:#8A5A2B;text-align:left">בְּצַלְאֵל</div></div>
+</div>
+<div style="background:#3B2A1E;padding:24px 28px;display:flex;gap:22px;align-items:center">
+<div style="display:flex;align-items:center;gap:12px"><svg width="44" height="44" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="url(#foil)" filter="url(#emboss)"></use></svg><div style="display:flex;flex-direction:column;gap:3px"><div style="font:500 32px/1 'EB Garamond',serif;background:linear-gradient(135deg,#F4DC98,#C9A04A 50%,#B08435);-webkit-background-clip:text;background-clip:text;color:transparent">Bezalel</div><div dir="rtl" style="font:400 13px/1.2 'Frank Ruhl Libre',serif;color:#C9A04A;text-align:left">בְּצַלְאֵל</div></div></div>
+<div style="flex:1;display:flex;align-items:center;gap:10px;background:#0C0A08;border-radius:14px;padding:14px 16px"><svg width="30" height="30" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="#B07A3E"></use></svg><div style="font:500 22px/1 'EB Garamond',serif;color:#A9814F">Bezalel</div><div style="margin-left:auto;font:600 9px 'Instrument Sans';letter-spacing:.14em;color:#7E6446">NIGHT</div></div>
+</div>
+<div style="padding:18px 28px 22px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty">The plumb bob reads first: line, collar, weighted body. The nib shows in the slit, and the flame sits where a pen's breather hole would be. All three readings stay clear.</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Nib-first — the <a class="dv-oid" href="#1c">1c</a> almond hung on a line</div>
+<div class="dv-card" style="width:500px">
+<div style="background:#E9E0CE;padding:26px;display:flex;gap:24px;align-items:center">
+<svg width="170" height="170" viewBox="0 0 100 100" style="display:block;flex:none;filter:drop-shadow(0 8px 18px rgba(30,20,10,.35))"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect width="100" height="100" rx="22.4" fill="#000" opacity="{{ grainOpacity }}" filter="url(#grain)"></rect><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity="{{ stitchOpacity }}" stroke-width=".9" stroke-dasharray="2.4 1.7"></rect><rect x="49.4" y="0" width="1.2" height="14" fill="#C9A04A"></rect><use href="#m-pb" x="14" y="13" width="72" height="72" fill="{{ markFill }}" filter="url(#emboss)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ smallSizes }}" as="s" hint-placeholder-count="1"><div style="display:flex;gap:12px;align-items:flex-end;padding:12px 14px;border-radius:14px;background:{{ s.bg }}">
+<svg width="60" height="60" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect x="49.2" y="0" width="1.6" height="12" fill="#C9A04A"></rect><use href="#m-pb" x="12" y="11" width="76" height="76" fill="{{ markFill }}"></use></svg>
+<svg width="40" height="40" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-pb" x="10" y="8" width="80" height="80" fill="{{ markFill }}"></use></svg>
+<svg width="29" height="29" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-pb" x="8" y="6" width="84" height="84" fill="#D9B566"></use></svg>
+<svg width="20" height="20" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-pb" x="6" y="4" width="88" height="88" fill="#D9B566"></use></svg>
+</div></sc-for>
+<div style="font:400 11px/1.4 'Instrument Sans';color:#6B5E4E">At 29pt and below the line is gone and it falls back to the plain 1c nib.</div>
+</div>
+</div>
+<div style="background:#F3ECDD;padding:24px 28px;display:flex;align-items:center;gap:14px">
+<svg width="46" height="46" viewBox="0 0 100 100"><use href="#m-pb" width="100" height="100" fill="#8A5A2B"></use></svg>
+<div style="display:flex;flex-direction:column;gap:2px"><div style="font:500 42px/1 'EB Garamond',serif;letter-spacing:.005em">Bezalel</div><div dir="rtl" style="font:400 15px/1.2 'Frank Ruhl Libre',serif;color:#8A5A2B;text-align:left">בְּצַלְאֵל</div></div>
+</div>
+<div style="background:#3B2A1E;padding:24px 28px;display:flex;gap:22px;align-items:center">
+<div style="display:flex;align-items:center;gap:12px"><svg width="44" height="44" viewBox="0 0 100 100"><use href="#m-pb" width="100" height="100" fill="url(#foil)" filter="url(#emboss)"></use></svg><div style="display:flex;flex-direction:column;gap:3px"><div style="font:500 32px/1 'EB Garamond',serif;background:linear-gradient(135deg,#F4DC98,#C9A04A 50%,#B08435);-webkit-background-clip:text;background-clip:text;color:transparent">Bezalel</div><div dir="rtl" style="font:400 13px/1.2 'Frank Ruhl Libre',serif;color:#C9A04A;text-align:left">בְּצַלְאֵל</div></div></div>
+<div style="flex:1;display:flex;align-items:center;gap:10px;background:#0C0A08;border-radius:14px;padding:14px 16px"><svg width="30" height="30" viewBox="0 0 100 100"><use href="#m-pb" width="100" height="100" fill="#B07A3E"></use></svg><div style="font:500 22px/1 'EB Garamond',serif;color:#A9814F">Bezalel</div><div style="margin-left:auto;font:600 9px 'Instrument Sans';letter-spacing:.14em;color:#7E6446">NIGHT</div></div>
+</div>
+<div style="padding:18px 28px 22px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty">This keeps the 1c almond whole and adds only the line and a flame-shaped cutout. It's the closest to what you picked, but the plumb-bob reading depends entirely on the line.</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Descending flame — the fire runs down into the nib's slit</div>
+<div class="dv-card" style="width:500px">
+<div style="background:#E9E0CE;padding:26px;display:flex;gap:24px;align-items:center">
+<svg width="170" height="170" viewBox="0 0 100 100" style="display:block;flex:none;filter:drop-shadow(0 8px 18px rgba(30,20,10,.35))"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect width="100" height="100" rx="22.4" fill="#000" opacity="{{ grainOpacity }}" filter="url(#grain)"></rect><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity="{{ stitchOpacity }}" stroke-width=".9" stroke-dasharray="2.4 1.7"></rect><rect x="49.4" y="0" width="1.2" height="14" fill="#C9A04A"></rect><use href="#m-pc" x="14" y="13" width="72" height="72" fill="{{ markFill }}" filter="url(#emboss)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ smallSizes }}" as="s" hint-placeholder-count="1"><div style="display:flex;gap:12px;align-items:flex-end;padding:12px 14px;border-radius:14px;background:{{ s.bg }}">
+<svg width="60" height="60" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect x="49.2" y="0" width="1.6" height="12" fill="#C9A04A"></rect><use href="#m-pc" x="12" y="11" width="76" height="76" fill="{{ markFill }}"></use></svg>
+<svg width="40" height="40" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-pc" x="10" y="8" width="80" height="80" fill="{{ markFill }}"></use></svg>
+<svg width="29" height="29" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-pc" x="8" y="6" width="84" height="84" fill="#D9B566"></use></svg>
+<svg width="20" height="20" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-pc" x="6" y="4" width="88" height="88" fill="#D9B566"></use></svg>
+</div></sc-for>
+<div style="font:400 11px/1.4 'Instrument Sans';color:#6B5E4E">The eyelet ring fills in below 40pt, but the flame cutout still holds.</div>
+</div>
+</div>
+<div style="background:#F3ECDD;padding:24px 28px;display:flex;align-items:center;gap:14px">
+<svg width="46" height="46" viewBox="0 0 100 100"><use href="#m-pc" width="100" height="100" fill="#8A5A2B"></use></svg>
+<div style="display:flex;flex-direction:column;gap:2px"><div style="font:500 42px/1 'EB Garamond',serif;letter-spacing:.005em">Bezalel</div><div dir="rtl" style="font:400 15px/1.2 'Frank Ruhl Libre',serif;color:#8A5A2B;text-align:left">בְּצַלְאֵל</div></div>
+</div>
+<div style="background:#3B2A1E;padding:24px 28px;display:flex;gap:22px;align-items:center">
+<div style="display:flex;align-items:center;gap:12px"><svg width="44" height="44" viewBox="0 0 100 100"><use href="#m-pc" width="100" height="100" fill="url(#foil)" filter="url(#emboss)"></use></svg><div style="display:flex;flex-direction:column;gap:3px"><div style="font:500 32px/1 'EB Garamond',serif;background:linear-gradient(135deg,#F4DC98,#C9A04A 50%,#B08435);-webkit-background-clip:text;background-clip:text;color:transparent">Bezalel</div><div dir="rtl" style="font:400 13px/1.2 'Frank Ruhl Libre',serif;color:#C9A04A;text-align:left">בְּצַלְאֵל</div></div></div>
+<div style="flex:1;display:flex;align-items:center;gap:10px;background:#0C0A08;border-radius:14px;padding:14px 16px"><svg width="30" height="30" viewBox="0 0 100 100"><use href="#m-pc" width="100" height="100" fill="#B07A3E"></use></svg><div style="font:500 22px/1 'EB Garamond',serif;color:#A9814F">Bezalel</div><div style="margin-left:auto;font:600 9px 'Instrument Sans';letter-spacing:.14em;color:#7E6446">NIGHT</div></div>
+</div>
+<div style="padding:18px 28px 22px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty">An eyelet hangs it like a real plumb bob. The flame and the nib's slit are one continuous cut, so the Spirit runs down into the writing point. The story is richest here, but it has the most detail.</div>
+</div>
+</div>
+
+</div>
+<div style="margin:30px 0 0;max-width:900px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty"><strong style="color:#1E1A16">My pick: <a class="dv-oid" href="#2a">2a</a>.</strong> The collar is the one detail that makes "plumb bob" read without the line, so all three meanings hold even at 20pt. <a class="dv-oid" href="#2c">2c</a>'s single flame-and-slit cut is a lovely idea and could carry over into 2a for large uses like the splash screen and covers.</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#2a">2a</a>, move to core screens" · "<a class="dv-oid" href="#2a">2a</a> with the <a class="dv-oid" href="#2c">2c</a> flame cut" · "try <a class="dv-oid" href="#2a">2a</a> on tekhelet blue leather"</p>
+</section>
+
+<section class="dv-turn" id="t1" data-screen-label="Brand foundation + marks">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Bezalel — brand foundation, three mark directions, and a recommendation</span></div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:28px;width:1720px;margin:0 0 36px">
+<div style="background:#F3ECDD;border-radius:14px;padding:32px 34px;display:flex;flex-direction:column;gap:22px">
+<div style="font:600 11px/1 'Instrument Sans';letter-spacing:.14em;text-transform:uppercase;color:#8A5A2B">Tabernacle materials · Exodus 26 &amp; 31</div>
+<div style="font:400 30px/1.25 'EB Garamond',serif;max-width:560px;text-wrap:pretty">A serious pocket instrument for scripture — the warmth of a leather study Bible, the exactness of a handheld tool.</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#F3ECDD;border:1px solid #DCCFB4"></div><div style="font:600 12px 'Instrument Sans'">Linen</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#F3ECDD</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#E5D7BA"></div><div style="font:600 12px 'Instrument Sans'">Parchment</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#E5D7BA</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:linear-gradient(135deg,#F4DC98,#C9A04A 45%,#8F6A25 75%,#E3C277)"></div><div style="font:600 12px 'Instrument Sans'">Gold</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#C9A04A</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#8A5A2B"></div><div style="font:600 12px 'Instrument Sans'">Bronze</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#8A5A2B</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#1E1A16"></div><div style="font:600 12px 'Instrument Sans'">Ink</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#1E1A16</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#1C2A44"></div><div style="font:600 12px 'Instrument Sans'">Tekhelet blue</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#1C2A44</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#4E2648"></div><div style="font:600 12px 'Instrument Sans'">Argaman purple</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#4E2648</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#9E2B25"></div><div style="font:600 12px 'Instrument Sans'">Scarlet</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#9E2B25</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#4A1F1A"></div><div style="font:600 12px 'Instrument Sans'">Oxblood leather</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#4A1F1A</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;border-radius:12px;background:#3B2A1E"></div><div style="font:600 12px 'Instrument Sans'">Umber leather</div><div style="font:400 11px ui-monospace,monospace;color:#6B5E4E">#3B2A1E</div></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;border-top:1px solid #DCCFB4;padding-top:20px">
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font:400 26px/1 'EB Garamond',serif">EB Garamond</div><div style="font:400 12px/1.45 'Instrument Sans';color:#6B5E4E">Scripture text. Full polytonic Greek, old-style figures, real italics.</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font:500 26px/1 'Frank Ruhl Libre',serif" dir="rtl">פרנק רוהל</div><div style="font:400 12px/1.45 'Instrument Sans';color:#6B5E4E">Frank Ruhl Libre — Hebrew with niqqud, set right-to-left.</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font:500 24px/1.05 'Instrument Sans'">Instrument Sans</div><div style="font:400 12px/1.45 'Instrument Sans';color:#6B5E4E">UI chrome — labels, controls, model picker. Never for scripture.</div></div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;align-content:start">
+<div style="background:#F3ECDD;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px">
+<div style="font:600 10px 'Instrument Sans';letter-spacing:.14em;text-transform:uppercase;color:#8A5A2B">Light · Linen</div>
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.08em;color:#6B5E4E">PSALM 119:105</div>
+<div style="font:400 20px/1.5 'EB Garamond',serif;color:#1E1A16;text-wrap:pretty">Thy <span style="border-bottom:1.5px dotted #8A5A2B">word</span> is a lamp unto my feet, and a light unto my path.</div>
+<div dir="rtl" style="font:400 21px/1.7 'Frank Ruhl Libre',serif;color:#1E1A16">נֵר־לְרַגְלִי <span style="background:#E5D7BA;border-radius:6px;padding:0 4px">דְבָרֶךָ</span> וְאוֹר לִנְתִיבָתִי</div>
+</div>
+<div style="background:#1A1411;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px">
+<div style="font:600 10px 'Instrument Sans';letter-spacing:.14em;text-transform:uppercase;color:#C9A04A">Dark · Leather</div>
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.08em;color:#A8977E">HEBREWS 4:12</div>
+<div style="font:400 20px/1.5 'EB Garamond',serif;color:#EDE3CF;text-wrap:pretty">For the word of God is quick, and powerful, and sharper than any <span style="border-bottom:1.5px dotted #C9A04A">twoedged</span> sword.</div>
+<div style="font:400 19px/1.5 'EB Garamond',serif;color:#EDE3CF">τομώτερος ὑπὲρ πᾶσαν <span style="background:#3B2A1E;border-radius:6px;padding:0 4px">μάχαιραν δίστομον</span></div>
+</div>
+<div style="background:#0C0A08;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px">
+<div style="font:600 10px 'Instrument Sans';letter-spacing:.14em;text-transform:uppercase;color:#B07A3E">Night · Low glare</div>
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.08em;color:#7E6446">EXODUS 31:3</div>
+<div style="font:400 20px/1.5 'EB Garamond',serif;color:#A9814F;text-wrap:pretty">And I have filled him with the spirit of God, in <span style="border-bottom:1.5px dotted #B07A3E">wisdom</span>, and in understanding.</div>
+<div dir="rtl" style="font:400 21px/1.7 'Frank Ruhl Libre',serif;color:#A9814F">בְּחָכְמָה וּבִתְבוּנָה</div>
+</div>
+<div style="grid-column:1 / -1;font:400 12px/1.55 'Instrument Sans';color:#5E5244;padding:4px 2px;text-wrap:pretty">Night mode drops blue entirely and caps text near 6:1 contrast on warm black. Scarlet and purple stay accents only — highlights, cross-reference tags, the build-a-tool surface — never body text grounds. Leather (grain, stitching, gold foil) is reserved for brand moments: icon, splash, cover of a user-built tool.</div>
+</div>
+</div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Lamp — Psalm 119:105 · Exodus 25:37</div>
+<div class="dv-card" style="width:540px">
+<div style="background:#E9E0CE;padding:28px;display:flex;gap:26px;align-items:center">
+<svg width="180" height="180" viewBox="0 0 100 100" style="display:block;flex:none;filter:drop-shadow(0 8px 18px rgba(30,20,10,.35))"><rect width="100" height="100" rx="22.4" fill="#1C2A44"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect width="100" height="100" rx="22.4" fill="#000" opacity="{{ grainOpacity }}" filter="url(#grain)"></rect><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity="{{ stitchOpacity }}" stroke-width=".9" stroke-dasharray="2.4 1.7"></rect><use href="#m-lamp" x="17" y="15" width="66" height="66" fill="{{ markFill }}" filter="url(#emboss)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ smallSizes }}" as="s" hint-placeholder-count="1"><div style="display:flex;gap:14px;align-items:flex-end;padding:12px 14px;border-radius:14px;background:{{ s.bg }}">
+<svg width="60" height="60" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#1C2A44"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-lamp" x="14" y="12" width="72" height="72" fill="{{ markFill }}"></use></svg>
+<svg width="40" height="40" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#1C2A44"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-lamp" x="12" y="10" width="76" height="76" fill="{{ markFill }}"></use></svg>
+<svg width="29" height="29" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#1C2A44"></rect><use href="#m-lamp" x="10" y="8" width="80" height="80" fill="#D9B566"></use></svg>
+<svg width="20" height="20" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#1C2A44"></rect><use href="#m-lamp" x="8" y="6" width="84" height="84" fill="#D9B566"></use></svg>
+</div></sc-for>
+<div style="font:400 11px/1.4 'Instrument Sans';color:#6B5E4E">60 · 40 · 29 · 20 pt. Stitching drops below 76pt; foil flattens to solid gold at 29.</div>
+</div>
+</div>
+<div style="background:#F3ECDD;padding:26px 28px;display:flex;align-items:center;gap:14px">
+<svg width="46" height="46" viewBox="0 0 100 100"><use href="#m-lamp" width="100" height="100" fill="#8A5A2B"></use></svg>
+<div style="display:flex;flex-direction:column;gap:2px"><div style="font:500 42px/1 'EB Garamond',serif;letter-spacing:.005em">Bezalel</div><div dir="rtl" style="font:400 15px/1.2 'Frank Ruhl Libre',serif;color:#8A5A2B;text-align:left">בְּצַלְאֵל</div></div>
+</div>
+<div style="background:#1C2A44;padding:30px 28px;display:flex;gap:28px;align-items:center;position:relative">
+<div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+<svg width="54" height="54" viewBox="0 0 100 100"><use href="#m-lamp" width="100" height="100" fill="url(#foil)" filter="url(#emboss)"></use></svg>
+<div style="font:500 30px/1 'EB Garamond',serif;letter-spacing:.24em;padding-left:.24em;background:linear-gradient(135deg,#F4DC98,#C9A04A 50%,#B08435);-webkit-background-clip:text;background-clip:text;color:transparent">BEZALEL</div>
+</div>
+<div style="flex:1;display:flex;align-items:center;gap:12px;background:#0C0A08;border-radius:14px;padding:16px 18px">
+<svg width="34" height="34" viewBox="0 0 100 100"><use href="#m-lamp" width="100" height="100" fill="#B07A3E"></use></svg>
+<div style="font:500 26px/1 'EB Garamond',serif;color:#A9814F">Bezalel</div>
+<div style="margin-left:auto;font:600 9px 'Instrument Sans';letter-spacing:.14em;color:#7E6446">NIGHT</div>
+</div>
+</div>
+<div style="padding:20px 28px 24px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty">An open oil lamp: a teardrop flame over a shallow bowl. Two solid shapes, no hairlines. Bezalel himself made the lampstand and its seven lamps (Ex 37:17–23), so the reference works twice: Scripture as a lamp, and the craftsman's own work. On tekhelet leather it also gives night reading a symbol.</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Blade — Hebrews 4:12 · Ephesians 6:17</div>
+<div class="dv-card" style="width:540px">
+<div style="background:#E9E0CE;padding:28px;display:flex;gap:26px;align-items:center">
+<svg width="180" height="180" viewBox="0 0 100 100" style="display:block;flex:none;filter:drop-shadow(0 8px 18px rgba(30,20,10,.35))"><rect width="100" height="100" rx="22.4" fill="#4A1F1A"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect width="100" height="100" rx="22.4" fill="#000" opacity="{{ grainOpacity }}" filter="url(#grain)"></rect><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity="{{ stitchOpacity }}" stroke-width=".9" stroke-dasharray="2.4 1.7"></rect><use href="#m-blade" x="16" y="15" width="68" height="68" fill="{{ markFill }}" stroke="#4A1F1A" stroke-width="2.4" paint-order="stroke" filter="url(#emboss)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ smallSizes }}" as="s" hint-placeholder-count="1"><div style="display:flex;gap:14px;align-items:flex-end;padding:12px 14px;border-radius:14px;background:{{ s.bg }}">
+<svg width="60" height="60" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#4A1F1A"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-blade" x="13" y="12" width="74" height="74" fill="{{ markFill }}" stroke="#4A1F1A" stroke-width="2.4" paint-order="stroke"></use></svg>
+<svg width="40" height="40" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#4A1F1A"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-blade" x="11" y="10" width="78" height="78" fill="{{ markFill }}" stroke="#4A1F1A" stroke-width="2.4" paint-order="stroke"></use></svg>
+<svg width="29" height="29" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#4A1F1A"></rect><use href="#m-blade" x="9" y="8" width="82" height="82" fill="#D9B566" stroke="#4A1F1A" stroke-width="3" paint-order="stroke"></use></svg>
+<svg width="20" height="20" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#4A1F1A"></rect><use href="#m-blade" x="7" y="6" width="86" height="86" fill="#D9B566" stroke="#4A1F1A" stroke-width="3.5" paint-order="stroke"></use></svg>
+</div></sc-for>
+<div style="font:400 11px/1.4 'Instrument Sans';color:#6B5E4E">The fuller groove closes up below 40pt; the blade/page split relies on a cut stroke.</div>
+</div>
+</div>
+<div style="background:#F3ECDD;padding:26px 28px;display:flex;align-items:center;gap:16px">
+<svg width="46" height="46" viewBox="0 0 100 100"><use href="#m-blade" width="100" height="100" fill="#4A1F1A" stroke="#F3ECDD" stroke-width="2.4" paint-order="stroke"></use></svg>
+<div style="font:500 30px/1 'EB Garamond',serif;letter-spacing:.24em;color:#1E1A16">BEZALEL</div>
+</div>
+<div style="background:#4A1F1A;padding:30px 28px;display:flex;gap:28px;align-items:center">
+<div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+<svg width="54" height="54" viewBox="0 0 100 100"><use href="#m-blade" width="100" height="100" fill="url(#foil)" stroke="#4A1F1A" stroke-width="2.4" paint-order="stroke" filter="url(#emboss)"></use></svg>
+<div style="font:500 30px/1 'EB Garamond',serif;letter-spacing:.24em;padding-left:.24em;background:linear-gradient(135deg,#F4DC98,#C9A04A 50%,#B08435);-webkit-background-clip:text;background-clip:text;color:transparent">BEZALEL</div>
+</div>
+<div style="flex:1;display:flex;align-items:center;gap:12px;background:#0C0A08;border-radius:14px;padding:16px 18px">
+<svg width="34" height="34" viewBox="0 0 100 100"><use href="#m-blade" width="100" height="100" fill="#B07A3E" stroke="#0C0A08" stroke-width="2.4" paint-order="stroke"></use></svg>
+<div style="font:500 20px/1 'EB Garamond',serif;letter-spacing:.2em;color:#A9814F">BEZALEL</div>
+<div style="margin-left:auto;font:600 9px 'Instrument Sans';letter-spacing:.14em;color:#7E6446">NIGHT</div>
+</div>
+</div>
+<div style="padding:20px 28px 24px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty">A two-edged blade rising from an open book. There's no hilt; the Word is the handle. The blade has a fuller groove like a real sword. The wordmark uses wide inscriptional capitals. It's the sharpest idea of the three, on oxblood leather.</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Instrument — the maker's nib · Exodus 25:33</div>
+<div class="dv-card" style="width:540px">
+<div style="background:#E9E0CE;padding:28px;display:flex;gap:26px;align-items:center">
+<svg width="180" height="180" viewBox="0 0 100 100" style="display:block;flex:none;filter:drop-shadow(0 8px 18px rgba(30,20,10,.35))"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><rect width="100" height="100" rx="22.4" fill="#000" opacity="{{ grainOpacity }}" filter="url(#grain)"></rect><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity="{{ stitchOpacity }}" stroke-width=".9" stroke-dasharray="2.4 1.7"></rect><use href="#m-nib" x="17" y="17" width="66" height="66" fill="{{ markFill }}" filter="url(#emboss)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ smallSizes }}" as="s" hint-placeholder-count="1"><div style="display:flex;gap:14px;align-items:flex-end;padding:12px 14px;border-radius:14px;background:{{ s.bg }}">
+<svg width="60" height="60" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-nib" x="14" y="14" width="72" height="72" fill="{{ markFill }}"></use></svg>
+<svg width="40" height="40" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-nib" x="12" y="12" width="76" height="76" fill="{{ markFill }}"></use></svg>
+<svg width="29" height="29" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-nib" x="10" y="10" width="80" height="80" fill="#D9B566"></use></svg>
+<svg width="20" height="20" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#3B2A1E"></rect><use href="#m-nib" x="8" y="8" width="84" height="84" fill="#D9B566"></use></svg>
+</div></sc-for>
+<div style="font:400 11px/1.4 'Instrument Sans';color:#6B5E4E">Crispest silhouette at 20pt, but it reads as "pen" before anything biblical.</div>
+</div>
+</div>
+<div style="background:#F3ECDD;padding:26px 28px;display:flex;align-items:center;gap:12px">
+<svg width="42" height="42" viewBox="0 0 100 100"><use href="#m-nib" width="100" height="100" fill="#3B2A1E"></use></svg>
+<div style="font:600 36px/1 'Instrument Sans',sans-serif;letter-spacing:-.02em">Bezalel</div>
+</div>
+<div style="background:#3B2A1E;padding:30px 28px;display:flex;gap:28px;align-items:center">
+<div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+<svg width="54" height="54" viewBox="0 0 100 100"><use href="#m-nib" width="100" height="100" fill="url(#foil)" filter="url(#emboss)"></use></svg>
+<div style="font:600 26px/1 'Instrument Sans',sans-serif;letter-spacing:-.01em;background:linear-gradient(135deg,#F4DC98,#C9A04A 50%,#B08435);-webkit-background-clip:text;background-clip:text;color:transparent">Bezalel</div>
+</div>
+<div style="flex:1;display:flex;align-items:center;gap:12px;background:#0C0A08;border-radius:14px;padding:16px 18px">
+<svg width="34" height="34" viewBox="0 0 100 100"><use href="#m-nib" width="100" height="100" fill="#B07A3E"></use></svg>
+<div style="font:600 22px/1 'Instrument Sans',sans-serif;color:#A9814F">Bezalel</div>
+<div style="margin-left:auto;font:600 9px 'Instrument Sans';letter-spacing:.14em;color:#7E6446">NIGHT</div>
+</div>
+</div>
+<div style="padding:20px 28px 24px;font:400 13px/1.55 'Instrument Sans';color:#3E352B;text-wrap:pretty">A scribe's nib cut in the shape of an almond, after the almond-blossom cups of the lampstand. It's the craftsman's tool and points straight at build-a-tool. The sans wordmark leans toward a precision instrument. Umber leather.</div>
+</div>
+</div>
+
+</div>
+
+<div style="margin:36px 0 0;max-width:1100px;background:#F3ECDD;border-radius:14px;padding:30px 34px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:24px 30px;align-items:start">
+<svg width="72" height="72" viewBox="0 0 100 100" style="display:block"><rect width="100" height="100" rx="22.4" fill="#1C2A44"></rect><rect width="100" height="100" rx="22.4" fill="url(#sheen)"></rect><use href="#m-lamp" x="15" y="13" width="70" height="70" fill="url(#foil)"></use></svg>
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.14em;text-transform:uppercase;color:#8A5A2B">Self-review · Recommendation</div>
+<div style="font:500 28px/1.25 'EB Garamond',serif;text-wrap:pretty">The strongest is <a class="dv-oid" href="#1a" style="font-size:14px;vertical-align:middle">1a</a> Lamp: wordmark in Garamond, Hebrew name beneath, set on tekhelet leather.</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;font:400 13px/1.55 'Instrument Sans';color:#3E352B">
+<div style="display:flex;flex-direction:column;gap:6px;text-wrap:pretty"><strong style="color:#1E1A16">Why 1a wins</strong>It holds at 20pt because it's two solid masses with no strokes to fill in. It's the reference readers recognize fastest. And it belongs to Bezalel himself, who made the lamps. It also gives night reading its own symbol, and the gold-on-blue icon is easy to spot on a home screen.</div>
+<div style="display:flex;flex-direction:column;gap:6px;text-wrap:pretty"><strong style="color:#1E1A16">Where the others fall short</strong><a class="dv-oid" href="#1b">1b</a> is the cleverest idea, but the book blurs below 40pt and the sword can feel combative. <a class="dv-oid" href="#1c">1c</a> fits the product best, but it reads as a notes app first. The almond nod is too subtle to carry the brand.</div>
+<div style="display:flex;flex-direction:column;gap:6px;text-wrap:pretty"><strong style="color:#1E1A16">Risk + mitigation</strong>Lamps and flames are common church marks. The shallow bowl and the cut-out inner flame set this one apart, so keep both. You could reuse the 1b blade as the cross-reference icon and the 1c nib as the build-a-tool icon inside the app.</div>
+</div>
+</div>
+</div>
+
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#1a">1a</a>, move to core screens" · "riff on <a class="dv-oid" href="#1a">1a</a> with a menorah-cup bowl" · "push <a class="dv-oid" href="#1b">1b</a> to hold at 29pt"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;stitching&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Leather&quot;},&quot;grain&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Leather&quot;},&quot;foil&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Leather&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    return {
+      stitchOpacity: (p.stitching ?? true) ? 0.6 : 0,
+      grainOpacity: (p.grain ?? true) ? 0.42 : 0,
+      markFill: (p.foil ?? true) ? 'url(#foil)' : '#D2AE5E',
+      smallSizes: [{ bg: '#F3ECDD' }, { bg: '#16120F' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

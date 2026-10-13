@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;family=Frank+Ruhl+Libre:wght@400;500&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E6DECF;font-family:'Instrument Sans',system-ui,sans-serif;color:#1E1A16}a{color:#8A5A2B}a:hover{color:#4A1F1A}button{font-family:inherit;cursor:pointer}button:focus-visible,textarea:focus-visible{outline:2px solid #C9A04A;outline-offset:2px}textarea{font-family:inherit}@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}</style>
+</helmet>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4DC98"></stop><stop offset=".42" stop-color="#C9A04A"></stop><stop offset=".7" stop-color="#8F6A25"></stop><stop offset="1" stop-color="#E3C277"></stop></linearGradient>
+<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" seed="7"></feTurbulence><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.6 0 0 0 -0.55"></feColorMatrix><feComposite in2="SourceGraphic" operator="in"></feComposite></filter>
+<symbol id="m-pa" viewBox="0 0 100 100"><path d="M49.2 0H50.8V21H49.2Z"></path><path d="M44 21H56V28H44Z"></path><path fill-rule="evenodd" d="M50 92L31 51C29 41 35 33 44 30L56 30C65 33 71 41 69 51ZM50 38C54 44 56.5 47.5 56.5 51.5C56.5 55.5 53.5 58 50 58C46.5 58 43.5 55.5 43.5 51.5C43.5 47.5 46 44 50 38ZM49.1 61H50.9V87H49.1Z"></path></symbol>
+</defs></svg>
+
+<section id="t1" style="padding:44px 48px 48px;display:flex;gap:56px;align-items:flex-start;width:1240px">
+
+<div style="flex:none;width:410px;height:840px;border-radius:{{ frame.outer }};background:#14100D;padding:10px;box-shadow:0 30px 60px rgba(30,20,10,.35),inset 0 0 0 2px #3B2A1E">
+<div style="position:relative;width:390px;height:820px;border-radius:{{ frame.inner }};overflow:hidden;background:{{ t.bg }};display:flex;flex-direction:column;color:{{ t.ink }}">
+
+<div style="flex:none;background:{{ t.bar }};color:{{ t.barInk }};position:relative">
+<sc-if value="{{ leather }}" hint-placeholder-val="{{ true }}"><svg width="390" height="100%" style="position:absolute;inset:0;width:100%;height:100%;opacity:.35" preserveAspectRatio="none"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg></sc-if>
+<div style="position:relative;height:{{ frame.status }};display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 34px;font:600 15px 'Instrument Sans'"><span>9:41</span><sc-if value="{{ ios }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:120px;height:34px;border-radius:20px;background:#000"></div></sc-if><span style="display:flex;gap:5px;align-items:center"><span style="width:17px;height:10px;border-radius:2px;border:1.5px solid currentColor;opacity:.9"></span></span></div>
+<div style="position:relative;display:flex;align-items:center;gap:10px;padding:6px 18px 14px">
+<svg width="26" height="26" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="{{ markFill }}"></use></svg>
+<div style="font:500 23px/1 'EB Garamond',serif">{{ title }}</div>
+<sc-if value="{{ showModelChip }}" hint-placeholder-val="{{ true }}"><button onClick="{{ openModels }}" style="margin-left:auto;display:flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 10px;border-radius:999px;border:1px solid {{ t.barLine }};background:transparent;color:{{ t.barInk }};font:500 13px 'Instrument Sans'"><span style="width:8px;height:8px;border-radius:50%;background:{{ model.dot }}"></span>{{ model.name }}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button></sc-if>
+<sc-if value="{{ showBack }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goWorkshop }}" style="margin-left:auto;height:34px;padding:0 12px;border-radius:999px;border:1px solid {{ t.barLine }};background:transparent;color:{{ t.barInk }};font:500 13px 'Instrument Sans'">Workshop</button></sc-if>
+</div>
+<sc-if value="{{ leather }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;left:10px;right:10px;bottom:5px;border-top:1px dashed #C9A04A;opacity:.45"></div></sc-if>
+</div>
+
+<div style="flex:1;overflow-y:auto;overflow-x:hidden">
+
+<sc-if value="{{ isStudy }}" hint-placeholder-val="{{ true }}">
+<div style="padding:18px 16px 24px;display:flex;flex-direction:column;gap:14px">
+<div style="align-self:center;font:600 10px 'Instrument Sans';letter-spacing:.14em;color:{{ t.mute }}">SERMON PREP · EXODUS 31</div>
+<div style="align-self:flex-end;max-width:80%;background:{{ t.userBub }};color:{{ t.userInk }};padding:11px 14px;border-radius:18px 18px 6px 18px;font:400 15px/1.45 'Instrument Sans'">Help me prepare a sermon on Bezalel — what's the heart of it?</div>
+<div style="display:flex;flex-direction:column;gap:10px;font:400 15.5px/1.55 'Instrument Sans';text-wrap:pretty">
+<div>This is the first time Scripture says someone was <em>filled with the Spirit of God</em>, and the result is craftsmanship. That gives you three movements: called, filled, put to work.</div>
+<div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:18px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;font:600 11px 'Instrument Sans';letter-spacing:.08em;color:{{ t.mute }}"><span>EXODUS 31:2–3</span><span>BSB</span></div>
+<div style="font:400 19px/1.55 'EB Garamond',serif;color:{{ t.ink }}">See, I have <button onClick="{{ w.called }}" style="all:unset;cursor:pointer;border-bottom:1.5px dotted {{ t.acc }}">called</button> by name Bezalel son of Uri, the son of Hur, of the tribe of Judah. And I have <button onClick="{{ w.filled }}" style="all:unset;cursor:pointer;border-bottom:1.5px dotted {{ t.acc }}">filled</button> him with the <button onClick="{{ w.spirit }}" style="all:unset;cursor:pointer;border-bottom:1.5px dotted {{ t.acc }}">Spirit</button> of God, with <button onClick="{{ w.skill }}" style="all:unset;cursor:pointer;border-bottom:1.5px dotted {{ t.acc }}">skill</button>, ability, and knowledge in all kinds of craftsmanship.</div>
+<div style="font:400 12px 'Instrument Sans';color:{{ t.mute }}">Tap an underlined word for the Hebrew</div>
+</div>
+</div>
+<div style="align-self:flex-end;max-width:80%;background:{{ t.userBub }};color:{{ t.userInk }};padding:11px 14px;border-radius:18px 18px 6px 18px;font:400 15px/1.45 'Instrument Sans'">Show me the lampstand he made.</div>
+<sc-if value="{{ model.image }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="height:220px;border-radius:18px;border:1px solid {{ t.line }};background:repeating-linear-gradient(135deg,{{ t.surf }} 0 10px,{{ t.bg }} 10px 20px);display:flex;align-items:flex-end;padding:12px;box-sizing:border-box"><span style="font:500 11px ui-monospace,monospace;color:{{ t.mute }};background:{{ t.surf }};padding:4px 8px;border-radius:999px">generated image · lampstand, Ex 37:17–24</span></div>
+<div style="font:400 12px 'Instrument Sans';color:{{ t.mute }}">Drawn by {{ model.name }} · beaten gold, almond-blossom cups, seven lamps</div>
+</div>
+</sc-if>
+<sc-if value="{{ noImage }}" hint-placeholder-val="{{ false }}">
+<div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font:400 14px/1.5 'Instrument Sans'"><span>{{ model.name }} doesn't draw images. You can switch for this one reply; the conversation stays put.</span><button onClick="{{ pickImageModel }}" style="align-self:flex-start;height:36px;padding:0 14px;border-radius:999px;border:1px solid {{ t.line }};background:transparent;color:{{ t.ink }};font:500 13px 'Instrument Sans'">Draw with Gemini Pro</button></div>
+</sc-if>
+<sc-if value="{{ switchNote }}" hint-placeholder-val="{{ false }}"><div style="align-self:center;font:500 12px 'Instrument Sans';color:{{ t.mute }};background:{{ t.surf }};border:1px solid {{ t.line }};padding:6px 12px;border-radius:999px">Now answering with {{ model.name }}</div></sc-if>
+<button onClick="{{ buildFromChat }}" style="align-self:flex-start;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 10px;border-radius:999px;border:1px solid {{ t.acc }};background:transparent;color:{{ t.ink }};font:500 14px 'Instrument Sans'"><svg width="20" height="20" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="{{ t.acc }}"></use></svg>Build a sermon outline tool from this</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isWorkshop }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 18px 24px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font:500 30px/1.1 'EB Garamond',serif">What should we build?</div><div style="font:italic 400 15px/1.4 'EB Garamond',serif;color:{{ t.mute }}">"…to devise artistic designs, to work in gold, silver, and bronze." Ex 31:4</div></div>
+<div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:12px">
+<textarea value="{{ desc }}" onChange="{{ setDesc }}" rows="4" placeholder="Describe a tool in a sentence or two" style="border:0;background:transparent;resize:none;color:{{ t.ink }};font:400 16px/1.5 'Instrument Sans';outline:none"></textarea>
+<div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ starters }}" as="s" hint-placeholder-count="3"><button onClick="{{ s.pick }}" style="height:32px;padding:0 12px;border-radius:999px;border:1px solid {{ t.line }};background:{{ t.bg }};color:{{ t.ink }};font:500 12.5px 'Instrument Sans'">{{ s.label }}</button></sc-for></div>
+</div>
+<sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}"><button onClick="{{ build }}" style="height:52px;border-radius:999px;border:0;background:{{ t.cta }};color:{{ t.ctaInk }};font:600 16px 'Instrument Sans';display:flex;align-items:center;justify-content:center;gap:10px"><svg width="22" height="22" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="url(#foil)"></use></svg>Build with {{ model.name }}</button></sc-if>
+<sc-if value="{{ building }}" hint-placeholder-val="{{ false }}">
+<div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.12em;color:{{ t.mute }}">{{ model.name }} IS DRAFTING YOUR TOOL</div>
+<sc-for list="{{ steps }}" as="st" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;font:400 15px 'Instrument Sans';opacity:{{ st.op }}"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid {{ t.acc }};background:{{ st.fill }};flex:none"></span>{{ st.label }}</div></sc-for>
+<div style="font:400 12px/1.45 'Instrument Sans';color:{{ t.mute }}">Once it's built, the tool lives on your phone and works offline.</div>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.12em;color:{{ t.mute }}">YOUR TOOLS</div>
+<sc-for list="{{ tools }}" as="tl" hint-placeholder-count="2"><button onClick="{{ tl.open }}" style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:18px;border:1px solid {{ t.line }};background:{{ t.surf }};color:{{ t.ink }};text-align:left"><span style="width:40px;height:40px;border-radius:12px;background:{{ tl.color }};flex:none;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="#E3C277"></use></svg></span><span style="display:flex;flex-direction:column;gap:2px"><span style="font:500 17px 'EB Garamond',serif">{{ tl.name }}</span><span style="font:400 12px 'Instrument Sans';color:{{ t.mute }}">{{ tl.meta }}</span></span></button></sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isTool }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 18px 24px;display:flex;flex-direction:column;gap:16px;animation:rise .45s ease-out">
+<div style="display:flex;flex-direction:column;gap:6px"><span style="align-self:flex-start;font:600 10px 'Instrument Sans';letter-spacing:.12em;padding:4px 9px;border-radius:999px;background:{{ t.surf }};border:1px solid {{ t.line }};color:{{ t.mute }}">BUILT BY YOU · OFFLINE</span><div style="font:500 30px/1.1 'EB Garamond',serif">Sermon Outline</div></div>
+<div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:4px"><div style="font:600 11px 'Instrument Sans';letter-spacing:.1em;color:{{ t.mute }}">TEXT</div><div style="font:500 18px 'EB Garamond',serif">Exodus 31:1–11</div></div>
+<div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:4px"><div style="font:600 11px 'Instrument Sans';letter-spacing:.1em;color:{{ t.mute }}">BIG IDEA</div><div style="font:400 20px/1.35 'EB Garamond',serif">God fills ordinary hands for holy work.</div></div>
+<sc-for list="{{ moves }}" as="mv" hint-placeholder-count="3"><div style="background:{{ t.surf }};border:1px solid {{ t.line }};border-radius:18px;overflow:hidden"><button onClick="{{ mv.toggle }}" style="all:unset;cursor:pointer;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px"><span style="font:500 20px 'EB Garamond',serif;color:{{ t.acc }};width:22px">{{ mv.num }}</span><span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font:500 18px 'EB Garamond',serif">{{ mv.title }}</span><span style="font:400 12px 'Instrument Sans';color:{{ t.mute }}">{{ mv.ref }}</span></span><span style="font:400 18px 'Instrument Sans';color:{{ t.mute }}">{{ mv.sign }}</span></button><sc-if value="{{ mv.open }}" hint-placeholder-val="{{ false }}"><div style="padding:0 16px 14px 50px;display:flex;flex-direction:column;gap:8px;font:400 14.5px/1.5 'Instrument Sans';text-wrap:pretty"><sc-for list="{{ mv.points }}" as="p" hint-placeholder-count="2"><div>{{ p }}</div></sc-for></div></sc-if></div></sc-for>
+<div style="display:flex;gap:10px"><button onClick="{{ goStudy }}" style="flex:1;height:46px;border-radius:999px;border:0;background:{{ t.cta }};color:{{ t.ctaInk }};font:600 14px 'Instrument Sans'">Discuss in Study</button><button onClick="{{ goWorkshop }}" style="flex:1;height:46px;border-radius:999px;border:1px solid {{ t.line }};background:transparent;color:{{ t.ink }};font:500 14px 'Instrument Sans'">Change the tool</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isShelf }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 18px;display:flex;flex-direction:column;gap:14px">
+<div style="font:500 30px/1.1 'EB Garamond',serif">Shelf</div>
+<sc-for list="{{ shelf }}" as="sh" hint-placeholder-count="3"><div style="padding:14px 16px;border-radius:18px;border:1px solid {{ t.line }};background:{{ t.surf }};display:flex;flex-direction:column;gap:3px"><span style="font:600 10px 'Instrument Sans';letter-spacing:.12em;color:{{ t.mute }}">{{ sh.kind }}</span><span style="font:500 18px 'EB Garamond',serif">{{ sh.name }}</span></div></sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="flex:none;position:relative;background:{{ t.bar }};color:{{ t.barInk }};padding:8px 18px {{ frame.navPad }};display:flex;align-items:flex-end;justify-content:space-around">
+<sc-if value="{{ leather }}" hint-placeholder-val="{{ true }}"><svg style="position:absolute;inset:0;width:100%;height:100%;opacity:.35" preserveAspectRatio="none"><rect width="100%" height="100%" filter="url(#grain)"></rect></svg><div style="position:absolute;left:10px;right:10px;top:5px;border-top:1px dashed #C9A04A;opacity:.45"></div></sc-if>
+<button onClick="{{ goStudy }}" style="all:unset;cursor:pointer;position:relative;width:90px;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:8px;font:600 11px 'Instrument Sans';opacity:{{ navOp.study }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>Study</button>
+<button onClick="{{ goWorkshop }}" style="all:unset;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;font:600 11px 'Instrument Sans';margin-top:-26px"><span style="width:62px;height:62px;border-radius:50%;background:#3B2A1E;box-shadow:0 6px 14px rgba(0,0,0,.35),inset 0 0 0 2px #C9A04A;display:flex;align-items:center;justify-content:center"><svg width="36" height="36" viewBox="0 0 100 100"><use href="#m-pa" width="100" height="100" fill="url(#foil)"></use></svg></span><span style="opacity:{{ navOp.workshop }}">Workshop</span></button>
+<button onClick="{{ goShelf }}" style="all:unset;cursor:pointer;position:relative;width:90px;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:8px;font:600 11px 'Instrument Sans';opacity:{{ navOp.shelf }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>Shelf</button>
+<sc-if value="{{ android }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:110px;height:4px;border-radius:2px;background:currentColor;opacity:.5"></div></sc-if>
+<sc-if value="{{ ios }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:currentColor;opacity:.7"></div></sc-if>
+</div>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(10,7,5,.5)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;max-height:82%;overflow-y:auto;background:{{ t.bg }};border-radius:28px 28px 0 0;padding:10px 18px 34px;box-shadow:0 -10px 30px rgba(0,0,0,.3);animation:rise .3s ease-out">
+<div style="width:40px;height:5px;border-radius:3px;background:{{ t.line }};margin:0 auto 14px"></div>
+
+<sc-if value="{{ sheetModels }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><div style="font:500 24px 'EB Garamond',serif">Choose a model</div><div style="font:400 12px 'Instrument Sans';color:{{ t.mute }}">Switch anytime; the chat stays</div></div>
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:6px"><div style="font:600 10.5px 'Instrument Sans';letter-spacing:.12em;color:{{ t.mute }}">{{ g.name }}</div>
+<sc-for list="{{ g.items }}" as="m" hint-placeholder-count="2"><button onClick="{{ m.pick }}" style="display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 14px;border-radius:16px;border:1.5px solid {{ m.border }};background:{{ t.surf }};color:{{ t.ink }};text-align:left"><span style="width:10px;height:10px;border-radius:50%;background:{{ m.dot }};flex:none"></span><span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font:500 15px 'Instrument Sans'">{{ m.name }}</span><span style="font:400 12px 'Instrument Sans';color:{{ t.mute }}">{{ m.note }}</span></span><sc-for list="{{ m.tags }}" as="tg" hint-placeholder-count="1"><span style="font:600 10px 'Instrument Sans';letter-spacing:.06em;padding:3px 8px;border-radius:999px;background:{{ t.bg }};border:1px solid {{ t.line }};color:{{ t.mute }}">{{ tg }}</span></sc-for></button></sc-for>
+</div></sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ sheetWord }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<div dir="rtl" style="font:400 21px/1.8 'Frank Ruhl Libre',serif;color:{{ t.mute }};text-align:right">{{ word.phraseA }}<span style="color:{{ t.ink }};background:{{ t.surf }};border:1px solid {{ t.acc }};border-radius:8px;padding:0 6px">{{ word.heb }}</span>{{ word.phraseB }}</div>
+<div style="display:flex;align-items:baseline;gap:12px"><div dir="rtl" style="font:500 40px/1 'Frank Ruhl Libre',serif">{{ word.heb }}</div><div style="display:flex;flex-direction:column;gap:2px"><span style="font:italic 400 19px 'EB Garamond',serif">{{ word.translit }}</span><span style="font:500 12px ui-monospace,monospace;color:{{ t.mute }}">{{ word.strong }} · {{ word.count }}× in the OT</span></div></div>
+<div style="font:400 19px/1.45 'EB Garamond',serif;text-wrap:pretty">{{ word.gloss }}</div>
+<div style="font:400 14.5px/1.55 'Instrument Sans';color:{{ t.ink }};text-wrap:pretty">{{ word.note }}</div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="font:600 10.5px 'Instrument Sans';letter-spacing:.12em;color:{{ t.mute }}">CROSS-REFERENCES</div><div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ word.refs }}" as="r" hint-placeholder-count="3"><span style="height:32px;display:inline-flex;align-items:center;padding:0 12px;border-radius:999px;background:{{ t.surf }};border:1px solid {{ t.line }};font:500 13px 'Instrument Sans'">{{ r }}</span></sc-for></div></div>
+<button onClick="{{ askAboutWord }}" style="height:46px;border-radius:999px;border:0;background:{{ t.cta }};color:{{ t.ctaInk }};font:600 14px 'Instrument Sans'">Ask {{ model.name }} about {{ word.translit }}</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+</div>
+</div>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:26px;padding-top:20px">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px 'Instrument Sans';letter-spacing:.14em;color:#8A5A2B">INTERACTIVE STORYBOARD · v1</div>
+<div style="font:500 40px/1.1 'EB Garamond',serif;max-width:620px">The study is a conversation. Tools come out of it.</div>
+<div style="font:400 15px/1.6 'Instrument Sans';color:#3E352B;max-width:620px;text-wrap:pretty">You described this as agent-led, not a Bible reader, so there's no book/chapter browser. Scripture shows up when the agent cites it, and every cited passage can be tapped for the Hebrew. The Workshop is the stamped mark in the middle of the tab bar.</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;max-width:620px">
+<sc-for list="{{ beats }}" as="b" hint-placeholder-count="5"><button onClick="{{ b.go }}" style="display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:18px;border:1px solid #DCCFB4;background:#F3ECDD;color:#1E1A16;text-align:left" style-hover="background:#E9DDC4"><span style="width:34px;height:34px;border-radius:50%;background:#3B2A1E;color:#E3C277;font:500 18px 'EB Garamond',serif;display:flex;align-items:center;justify-content:center;flex:none">{{ b.n }}</span><span style="display:flex;flex-direction:column;gap:2px"><span style="font:600 15px 'Instrument Sans'">{{ b.title }}</span><span style="font:400 13px/1.45 'Instrument Sans';color:#5E5244">{{ b.body }}</span></span></button></sc-for>
+</div>
+<div style="font:400 13px/1.6 'Instrument Sans';color:#5E5244;max-width:620px;text-wrap:pretty">Use Tweaks to compare the variations: leather vs. clean paper, light/dark/night, and iOS vs. Android. Nothing here implies a server. The only waiting state is the model drafting a tool, and it's labeled with the model's name.</div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;treatment&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;leather&quot;,&quot;paper&quot;],&quot;default&quot;:&quot;leather&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Variation&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;,&quot;night&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Variation&quot;},&quot;platform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ios&quot;,&quot;android&quot;],&quot;default&quot;:&quot;ios&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Variation&quot;}}">
+const THEMES = {
+  light: { bg:'#F3ECDD', surf:'#FBF7EE', ink:'#1E1A16', mute:'#6B5E4E', line:'#DCCFB4', acc:'#8A5A2B', userBub:'#3B2A1E', userInk:'#F3ECDD', cta:'#3B2A1E', ctaInk:'#F3ECDD' },
+  dark:  { bg:'#1A1411', surf:'#241C17', ink:'#EDE3CF', mute:'#A8977E', line:'#3A2E25', acc:'#C9A04A', userBub:'#3A2E25', userInk:'#EDE3CF', cta:'#C9A04A', ctaInk:'#1A1411' },
+  night: { bg:'#0C0A08', surf:'#15110E', ink:'#A9814F', mute:'#7E6446', line:'#2A2119', acc:'#B07A3E', userBub:'#1E1813', userInk:'#A9814F', cta:'#3A2A1A', ctaInk:'#C79A5E' }
+};
+const MODELS = [
+  { g:'ANTHROPIC', id:'sonnet', name:'Claude Sonnet', note:'Careful with sources', dot:'#C67139', tags:[] },
+  { g:'ANTHROPIC', id:'haiku', name:'Claude Haiku', note:'Fast, light', dot:'#C67139', tags:[] },
+  { g:'OPENAI', id:'gpt', name:'GPT', note:'General purpose', dot:'#5E8C6A', tags:['IMAGES'], image:true },
+  { g:'XAI', id:'grok', name:'Grok', note:'Conversational', dot:'#8A8A8A', tags:[] },
+  { g:'GOOGLE', id:'gemini', name:'Gemini Pro', note:'Long context', dot:'#4A6FA5', tags:['IMAGES'], image:true },
+  { g:'GOOGLE', id:'flash', name:'Gemini Flash', note:'Free tier', dot:'#4A6FA5', tags:['FREE'] },
+  { g:'OTHER', id:'llama', name:'Llama (open)', note:'Free hosted model', dot:'#7A8A5E', tags:['FREE'] },
+  { g:'OTHER', id:'key', name:'Your API key', note:'Any compatible endpoint', dot:'#9E2B25', tags:['BYO'] }
+];
+const WORDS = {
+  called: { heb:'קָרָאתִי', translit:'qārāʾ', strong:'H7121', count:739, gloss:'to call, to summon by name, to proclaim', note:'Being "called by name" is the language of commissioning. Isaiah uses the same phrase for Israel and for Cyrus.', refs:['Isa 43:1','Isa 45:3','Ex 35:30'], phraseA:'רְאֵה ', phraseB:' בְשֵׁם בְּצַלְאֵל' },
+  filled: { heb:'וָאֲמַלֵּא', translit:'mālēʾ', strong:'H4390', count:252, gloss:'to fill, to be full; to consecrate', note:'The same root is used for "filling the hand", the phrase for ordaining priests. Bezalel\u2019s hands are ordained for the work.', refs:['Ex 28:41','Ex 35:31','Deut 34:9','Acts 2:4'], phraseA:'', phraseB:' אֹתוֹ רוּחַ אֱלֹהִים' },
+  spirit: { heb:'רוּחַ', translit:'rûaḥ', strong:'H7307', count:378, gloss:'wind, breath, spirit', note:'The same breath that hovers over the waters in Genesis 1:2 now rests on a craftsman.', refs:['Gen 1:2','Num 11:25','Isa 11:2','Acts 2:3'], phraseA:'וָאֲמַלֵּא אֹתוֹ ', phraseB:' אֱלֹהִים' },
+  skill: { heb:'בְּחָכְמָה', translit:'ḥokmâ', strong:'H2451', count:149, gloss:'wisdom, skill, technical expertise', note:'Hebrew "wisdom" includes skill with your hands. The fear of the Lord in Proverbs and the work at the workbench share one word.', refs:['Ex 28:3','1 Kgs 7:14','Prov 9:10'], phraseA:'רוּחַ אֱלֹהִים ', phraseB:' וּבִתְבוּנָה' }
+};
+const STEPS = ['Reading your request','Laying out the sections','Linking it to Exodus 31','Saving it to your phone'];
+const MOVES = [
+  { num:'I', title:'Called by name', ref:'v. 2', points:['God names an artisan, not a priest or a king.','Your work is a calling before it\u2019s a career.'] },
+  { num:'II', title:'Filled with the Spirit', ref:'v. 3–5', points:['The first Spirit-filling in Scripture is for craftsmanship.','Skill (ḥokmâ) is the same word as wisdom.'] },
+  { num:'III', title:'Given to the work', ref:'v. 6–11', points:['Oholiab is given to work alongside him; no one builds alone.','Close: the lampstand they made, Ex 37:17.'] }
+];
+class Component extends DCLogic {
+  state = { tab:'study', sheet:null, word:'spirit', model:'sonnet', switched:false, stage:0, desc:'', built:false, open:0 };
+  componentWillUnmount() { clearTimeout(this._t); }
+  build = () => {
+    if (!this.state.desc.trim()) this.setState({ desc:'A sermon outline helper: give it a passage, it drafts a big idea and three movements I can edit.' });
+    const tick = n => { this.setState({ stage:n }); if (n < 5) this._t = setTimeout(() => tick(n + 1), 750); else this._t = setTimeout(() => this.setState({ tab:'tool', stage:0, built:true }), 450); };
+    tick(1);
+  };
+  pick = id => this.setState({ model:id, sheet:null, switched:true });
+  renderVals() {
+    const p = this.props, s = this.state;
+    const mode = p.mode ?? 'light', leather = (p.treatment ?? 'leather') === 'leather', android = (p.platform ?? 'ios') === 'android';
+    const base = THEMES[mode] || THEMES.light;
+    const t = { ...base, bar: leather ? (mode === 'night' ? '#120D0A' : '#3B2A1E') : base.bg, barInk: leather ? (mode === 'night' ? '#A9814F' : '#EDE3CF') : base.ink, barLine: leather ? 'rgba(201,160,74,.5)' : base.line };
+    const model = MODELS.find(m => m.id === s.model);
+    const groups = [];
+    MODELS.forEach(m => { let g = groups.find(x => x.name === m.g); if (!g) groups.push(g = { name:m.g, items:[] }); g.items.push({ ...m, border: m.id === s.model ? t.acc : t.line, pick: () => this.pick(m.id) }); });
+    const w = WORDS[s.word];
+    const tools = [
+      ...(s.built ? [{ name:'Sermon Outline', meta:'Just built · Exodus 31:1–11', color:'#3B2A1E', open: () => this.setState({ tab:'tool' }) }] : []),
+      { name:'Ḥesed word study', meta:'Built last week · 248 uses of the word', color:'#1C2A44', open: () => {} },
+      { name:'Lent reading plan', meta:'40 days · day 12', color:'#4E2648', open: () => {} }
+    ];
+    const tab = s.tab;
+    return {
+      t, leather, ios: !android, android, model, groups, word: w,
+      markFill: leather ? 'url(#foil)' : t.acc,
+      frame: android ? { outer:'40px', inner:'32px', status:'40px', navPad:'22px' } : { outer:'58px', inner:'48px', status:'54px', navPad:'30px' },
+      title: { study:'Study', workshop:'Workshop', tool:'Sermon Outline', shelf:'Shelf' }[tab],
+      isStudy: tab === 'study', isWorkshop: tab === 'workshop', isTool: tab === 'tool', isShelf: tab === 'shelf',
+      showModelChip: tab !== 'tool', showBack: tab === 'tool',
+      navOp: { study: tab === 'study' ? 1 : .55, workshop: tab === 'workshop' || tab === 'tool' ? 1 : .55, shelf: tab === 'shelf' ? 1 : .55 },
+      noImage: !model.image, switchNote: s.switched,
+      sheetOpen: !!s.sheet, sheetModels: s.sheet === 'models', sheetWord: s.sheet === 'word',
+      openModels: () => this.setState({ sheet:'models' }), closeSheet: () => this.setState({ sheet:null }),
+      pickImageModel: () => this.pick('gemini'),
+      w: Object.fromEntries(Object.keys(WORDS).map(k => [k, () => this.setState({ word:k, sheet:'word' })])),
+      askAboutWord: () => this.setState({ sheet:null }),
+      goStudy: () => this.setState({ tab:'study', sheet:null }), goWorkshop: () => this.setState({ tab:'workshop', sheet:null }), goShelf: () => this.setState({ tab:'shelf', sheet:null }),
+      buildFromChat: () => this.setState({ tab:'workshop', desc:'A sermon outline helper for Exodus 31: big idea, three movements, an illustration for each.' }),
+      desc: s.desc, setDesc: e => this.setState({ desc:e.target.value }),
+      starters: ['Sermon outline helper','Word study view','Reading plan'].map(l => ({ label:l, pick: () => this.setState({ desc: l + ': ' }) })),
+      idle: s.stage === 0, building: s.stage > 0, build: this.build,
+      steps: STEPS.map((l, i) => ({ label:l, op: s.stage > i ? 1 : .4, fill: s.stage > i + 1 ? t.acc : 'transparent' })),
+      tools,
+      moves: MOVES.map((m, i) => ({ ...m, open: s.open === i, sign: s.open === i ? '–' : '+', toggle: () => this.setState({ open: s.open === i ? -1 : i }) })),
+      shelf: [{ kind:'TOOL', name:'Ḥesed word study' }, { kind:'CONVERSATION', name:'Sermon prep · Exodus 31' }, { kind:'TOOL', name:'Lent reading plan' }],
+      beats: [
+        { n:'1', title:'Ask', body:'The agent answers and cites a passage inline.', go: () => this.setState({ tab:'study', sheet:null }) },
+        { n:'2', title:'Tap a word', body:'Hebrew, Strong\u2019s number, gloss and cross-references in a sheet.', go: () => this.setState({ tab:'study', word:'spirit', sheet:'word' }) },
+        { n:'3', title:'Switch models', body:'The picker is a chip in the header. The chat stays put, and image models draw inline.', go: () => this.setState({ tab:'study', sheet:'models' }) },
+        { n:'4', title:'Describe a tool', body:'Start from the stamped mark or from a suggestion in the chat.', go: () => this.setState({ tab:'workshop', sheet:null, stage:0 }) },
+        { n:'5', title:'Use what you built', body:'The finished sermon outline opens as a working panel.', go: () => this.setState({ tab:'tool', sheet:null, built:true }) }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
