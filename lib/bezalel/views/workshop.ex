@@ -111,11 +111,14 @@ defmodule Bezalel.Views.Workshop do
   end
 
   defp build_label(model) do
-    if Workshop.live?(), do: "Build with " <> model.name, else: "Build (scripted)"
+    if Workshop.live?(), do: "Build with " <> model.name, else: "Build the sample"
   end
 
   defp build_state(nil, model, tap) do
-    UI.pill_button(build_label(model), tap, :primary, height: 52, text_size: 16)
+    [
+      UI.pill_button(build_label(model), tap, :primary, height: 52, text_size: 16),
+      sample_note()
+    ]
   end
 
   defp build_state({:failed, reason}, model, tap) do
@@ -124,7 +127,8 @@ defmodule Bezalel.Views.Workshop do
         [~MOB(<Text text={reason} text_size={14} line_height={1.5} text_color={:on_surface} />)],
         padding: 14
       ),
-      UI.pill_button(build_label(model), tap, :primary, height: 52, text_size: 16)
+      UI.pill_button(build_label(model), tap, :primary, height: 52, text_size: 16),
+      sample_note()
     ]
   end
 
@@ -132,7 +136,7 @@ defmodule Bezalel.Views.Workshop do
     heading =
       if Workshop.live?(),
         do: String.upcase(model.name) <> " IS DRAFTING YOUR TOOL",
-        else: "DRAFTING YOUR TOOL (SCRIPTED)"
+        else: "BUILDING THE SAMPLE (SCRIPTED)"
 
     steps =
       for {label, i} <- Enum.with_index(Workshop.steps()) do
@@ -167,6 +171,18 @@ defmodule Bezalel.Views.Workshop do
       padding: 16,
       gap: 12
     )
+  end
+
+  # Without a model the builder ignores the description; say so up front.
+  defp sample_note do
+    if Workshop.live?(),
+      do: [],
+      else: ~MOB(<Text
+  text="No model is connected, so this builds the design’s sample whatever you describe: a sermon outline for Exodus 31:1–11."
+  text_size={12}
+  line_height={1.45}
+  text_color={:muted}
+/>)
   end
 
   defp built_when(at) do
@@ -290,7 +306,7 @@ defmodule Bezalel.Views.Workshop do
 
   @doc "Handles a Workshop event."
   def handle({:starter, label}, socket),
-    do: {:noreply, Socket.assign(socket, desc: starter_text(label), build: nil)}
+    do: {:noreply, Socket.assign(socket, desc: label <> ": ", build: nil)}
 
   def handle({:open_tool, id}, socket), do: {:noreply, Helpers.open_tool(socket, id)}
 
@@ -298,7 +314,7 @@ defmodule Bezalel.Views.Workshop do
     desc =
       case String.trim(socket.assigns.desc) do
         "" ->
-          "A sermon outline helper for Exodus 31: a big idea and three movements I can edit."
+          "A sermon outline helper: give it a passage, it drafts a big idea and three movements I can edit."
 
         text ->
           text
@@ -364,8 +380,4 @@ defmodule Bezalel.Views.Workshop do
      |> Socket.assign(desc: socket.assigns.tool.description, build: nil)
      |> Helpers.go(:workshop)}
   end
-
-  # The outline starter names the passage the storyboard builds for.
-  defp starter_text("Sermon outline helper"), do: "Sermon outline helper: Exodus 31"
-  defp starter_text(label), do: label <> ": "
 end

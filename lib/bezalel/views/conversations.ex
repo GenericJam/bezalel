@@ -9,10 +9,14 @@ defmodule Bezalel.Views.Conversations do
 
   @page 30
 
-  @doc "Loads the first page of the shelf (on entering the tab)."
+  @doc """
+  Loads the shelf: the first page on entering the tab, or as many rows as
+  are already paged in when something changed underneath it.
+  """
   def load(socket) do
-    shelf = Library.list_conversations(limit: @page)
-    Socket.assign(socket, shelf: shelf, shelf_done: length(shelf) < @page)
+    limit = max(length(socket.assigns.shelf), @page)
+    shelf = Library.list_conversations(limit: limit)
+    Socket.assign(socket, shelf: shelf, shelf_done: length(shelf) < limit)
   end
 
   @doc "The Conversations body: a lazy list, paged in as it scrolls."

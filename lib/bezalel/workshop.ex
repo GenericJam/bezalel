@@ -66,60 +66,23 @@ end
 
 defmodule Bezalel.Workshop.Storyboard do
   @moduledoc """
-  The design's tool build: a sermon outline for Exodus 31:1–11 (big idea and
-  three movements). It builds only when asked for a sermon outline that
-  names Exodus 31 and no other passage; anything else needs a connected
-  model, and says so rather than handing back the Exodus outline.
+  The design's tool build: whatever is described, it builds the design's
+  sample, a sermon outline for Exodus 31:1–11 (big idea and three
+  movements). The Workshop says so before the build; building what was
+  described needs a connected model.
   """
   @behaviour Bezalel.Workshop
-
-  # A backstop for the allowlist: other books named next to Exodus 31.
-  @other_books ~w(genesis gen leviticus lev numbers num deuteronomy deut dt joshua josh
-                  judges judg ruth samuel sam kings kgs chronicles chr ezra nehemiah neh
-                  esther esth job psalm psalms ps prov proverbs ecclesiastes eccl song
-                  isaiah isa jeremiah jer lamentations lam ezekiel ezek daniel dan hosea hos
-                  joel amos obadiah obad jonah micah mic nahum nah habakkuk hab zephaniah zeph
-                  haggai hag zechariah zech malachi mal matthew matt mt mark mk luke lk john jn
-                  acts romans rom corinthians cor galatians gal ephesians eph philippians phil
-                  colossians col thessalonians thess timothy tim titus philemon phlm hebrews
-                  heb james jas peter pet jude revelation rev)
 
   @impl true
   def live?, do: false
 
   @impl true
-  def build(description, _model, on_step) do
+  def build(_description, _model, on_step) do
     on_step.(0)
-
-    if exodus_outline?(description) do
-      on_step.(1)
-      on_step.(2)
-      {:ok, %{name: "Sermon Outline", kind: "sermon_outline", data: outline(), by: "storyboard"}}
-    else
-      {:error,
-       "Without a connected model the Workshop can only build the design’s sermon outline for " <>
-         "Exodus 31. Ask for that, or try again once a model is connected."}
-    end
+    on_step.(1)
+    on_step.(2)
+    {:ok, %{name: "Sermon Outline", kind: "sermon_outline", data: outline(), by: "storyboard"}}
   end
-
-  defp exodus_outline?(description) do
-    low = String.downcase(description)
-    # Exodus 31 however it's written: Exodus 31, Exod. 31, Ex 31:2–3,
-    # Exodus chapter 31, Exodus 31:1–31:11.
-    exodus_31 =
-      Regex.compile!(
-        "\\bex(od(us)?)?\\.?\\s*(chapter\\s*)?31\\b(:\\d+(\\s*[–-]\\s*(31:)?\\d+)?)?",
-        "u"
-      )
-
-    rest = Regex.replace(exodus_31, low, " ")
-    words = String.split(rest, Regex.compile!("[^\\p{L}\\p{N}]+", "u"), trim: true)
-
-    rest != low and "sermon" in words and "outline" in words and
-      not Enum.any?(words, &(&1 in @other_books or digit?(&1)))
-  end
-
-  defp digit?(word), do: String.contains?(word, ~w(0 1 2 3 4 5 6 7 8 9))
 
   defp outline do
     %{

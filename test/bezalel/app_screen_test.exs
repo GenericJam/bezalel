@@ -190,7 +190,7 @@ defmodule Bezalel.AppScreenTest do
   test "a build that finishes after the user left the Workshop doesn't pull them back" do
     view = mount_screen(AppScreen)
     view = render_info(view, {:tap, {:tab, :workshop}})
-    view = render_info(view, {:tap, {:workshop, {:starter, "Sermon outline helper"}}})
+    view = render_info(view, {:change, :desc, "Sermon outline for Exodus 31"})
     view = render_info(view, {:tap, {:workshop, :build}})
     view = render_info(view, {:tap, {:tab, :settings}})
     view = render_async(view)
