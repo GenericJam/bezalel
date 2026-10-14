@@ -73,12 +73,25 @@ defmodule Bezalel.AgentWorkshopTest do
     assert steps |> Enum.map(fn {:step, i} -> i end) |> Enum.uniq() == [0, 1, 2, 3]
   end
 
+  test "the outline is built for Exodus 31 however the passage is written" do
+    for desc <- [
+          "Sermon outline helper: ",
+          "A sermon outline helper for Exodus 31:2–3: big idea, three movements",
+          "Sermon outline, Ex 31:1-11"
+        ] do
+      assert {:ok, _} = Workshop.build(desc, nil, "sonnet", fn _ -> :ok end), desc
+    end
+  end
+
   test "without a model, any other tool is refused with a reason and nothing is saved" do
     for desc <- [
           "Reading plan: Lent, 40 days",
           "Sermon manuscript for John 3",
           "Romans 12 outline",
-          "Sermon outline for Romans 12"
+          "Sermon outline for Romans 12",
+          "Sermon outline for Exodus 20",
+          "Sermon outline for Jn 3",
+          "Sermon outline on Ruth"
         ] do
       assert {:error, reason} = Workshop.build(desc, nil, "sonnet", fn _ -> :ok end), desc
       assert reason =~ "only build the design’s sermon outline"

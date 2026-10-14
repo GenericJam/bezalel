@@ -322,11 +322,14 @@ defmodule Bezalel.Views.Study do
 
   # ── Events ────────────────────────────────────────────────────────────────
 
-  @doc "Handles a Study event."
+  @doc """
+  Handles a Study event. Sending waits for the conversation's pending reply
+  (the draft stays), so replies come back in the order they were asked.
+  """
   def handle(:send, socket) do
     text = String.trim(socket.assigns.draft)
 
-    if text == "" do
+    if text == "" or Helpers.replying?(socket.assigns) do
       {:noreply, socket}
     else
       {:ok, _} = Library.add_message(socket.assigns.conversation, %{role: :user, text: text})
@@ -430,8 +433,9 @@ defmodule Bezalel.Views.Study do
   @doc """
   Asks the agent for the next reply to the open conversation. The task is
   bound to that conversation and the model chosen now: its result lands
-  there even if the user has moved on, and a second send doesn't cancel the
-  first (each reply is its own task).
+  there even if the user has moved on. Each conversation has at most one
+  reply in flight (`handle(:send, _)` waits), and replies in different
+  conversations run side by side.
   """
   def respond(socket) do
     %{id: conversation_id} = socket.assigns.conversation
@@ -467,7 +471,7 @@ defmodule Bezalel.Views.Study do
         expanded = MapSet.union(socket.assigns.expanded, Helpers.summaries_open([message]))
         socket |> Socket.assign(:expanded, expanded) |> Helpers.reload_messages()
       else
-        socket
+        Helpers.refresh(socket)
       end
     else
       # The conversation went away meanwhile: nothing to add it to.

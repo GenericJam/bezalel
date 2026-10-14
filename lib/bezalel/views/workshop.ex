@@ -333,7 +333,10 @@ defmodule Bezalel.Views.Workshop do
 
     if socket.assigns.tab == :workshop,
       do: Helpers.open_tool(socket, tool.id),
-      else: Helpers.toast(socket, "#{tool.name} is built. It’s in the Workshop.")
+      else:
+        socket
+        |> Helpers.refresh()
+        |> Helpers.toast("#{tool.name} is built. It’s in the Workshop.")
   end
 
   def built({:ok, {:error, reason}}, socket), do: Socket.assign(socket, :build, {:failed, reason})

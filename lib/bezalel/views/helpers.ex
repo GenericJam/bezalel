@@ -49,6 +49,12 @@ defmodule Bezalel.Views.Helpers do
 
   def go(socket, tab), do: Socket.assign(socket, :tab, tab)
 
+  @doc "Reloads the visible tab's data after something changed underneath it."
+  def refresh(%{assigns: %{tab: tab}} = socket) when tab in [:convs, :workshop, :settings],
+    do: go(socket, tab)
+
+  def refresh(socket), do: socket
+
   @doc "Shows a built tool (the Workshop's tool view), or the Workshop if it's gone."
   def open_tool(socket, id) do
     case Library.get_tool(id) do

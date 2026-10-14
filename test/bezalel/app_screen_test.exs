@@ -47,6 +47,7 @@ defmodule Bezalel.AppScreenTest do
   test "a reply lands in the conversation it was asked in, even after switching away" do
     view = mount_screen(AppScreen)
     study = assigns(view).conversation
+    before = length(assigns(view).messages)
     view = render_info(view, {:change, :draft, "What does “skill” mean?"})
     view = render_info(view, {:tap, {:study, :send}})
     view = render_info(view, {:tap, {:convs, :new}})
@@ -56,10 +57,12 @@ defmodule Bezalel.AppScreenTest do
 
     assert assigns(view).conversation.id == new.id
     assert assigns(view).messages == []
-    assert %{role: :agent} = List.last(Library.messages(study.id))
+    asked = study.id |> Library.messages() |> Enum.drop(before)
+    assert [%{role: :user, text: "What does “skill” mean?"}, %{role: :agent} = reply] = asked
+    assert Enum.find(reply.blocks, &(&1["id"] == "sum"))["first"] =~ "ḥokmâ"
   end
 
-  test "two questions in a row both get answered" do
+  test "while a reply is on its way, sending waits and keeps the draft" do
     view = mount_screen(AppScreen)
     before = length(assigns(view).messages)
 
@@ -67,10 +70,15 @@ defmodule Bezalel.AppScreenTest do
     view = render_info(view, {:tap, {:study, :send}})
     view = render_info(view, {:change, :draft, "Oholiab?"})
     view = render_info(view, {:tap, {:study, :send}})
+    assert assigns(view).draft == "Oholiab?"
+
+    view = render_async(view)
+    view = render_info(view, {:tap, {:study, :send}})
     view = render_async(view)
 
-    roles = assigns(view).messages |> Enum.drop(before) |> Enum.map(& &1.role)
-    assert Enum.frequencies(roles) == %{user: 2, agent: 2}
+    asked = assigns(view).messages |> Enum.drop(before)
+    assert [:user, :agent, :user, :agent] = Enum.map(asked, & &1.role)
+    assert [%{text: "skill?"}, _, %{text: "Oholiab?"}, _] = asked
   end
 
   test "a delete for a message that's already gone does nothing" do
@@ -105,7 +113,8 @@ defmodule Bezalel.AppScreenTest do
     view = render_info(view, {:tap, {:study, :send}})
     view = render_async(view)
 
-    assert text(view) =~ "H7307"
+    reply = List.last(assigns(view).messages)
+    assert Enum.find(reply.blocks, &(&1["id"] == "sum"))["first"] =~ "רוּחַ (rûaḥ, H7307)"
   end
 
   test "deleting the last reply offers Undo and Ask again; Undo puts it back" do
@@ -162,7 +171,8 @@ defmodule Bezalel.AppScreenTest do
 
     assert assigns(view).tab == :settings
     assert assigns(view).toast.text =~ "Sermon Outline is built"
-    assert Library.tool_count() == 1
+    # The open Settings tab counts it.
+    assert text(view) =~ "1 built"
   end
 
   test "a tool that's gone opens the Workshop instead" do
