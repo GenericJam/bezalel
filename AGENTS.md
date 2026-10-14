@@ -51,9 +51,11 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 - `Bezalel.DesignGalleryScreen` (Settings → Design specimen) shows every
   plugin piece; `mix run --no-start scripts/design_tour.exs /tmp/tour <node>...`
   captures it in every theme × cover over dist.
-- `android/.../MobBridge.kt` carries mob_new's merged MOB-477 (rounded clip,
-  flexing `<Spacer/>`), unreleased. Keep it if you regenerate the native
-  project before mob_new ships it.
+- `android/.../MobBridge.kt` carries mob_new's merged, unreleased MOB-477
+  (rounded clip, flexing `<Spacer/>`) and MOB-481 (`<Scroll anchor="bottom">`,
+  which Study uses to open at and follow the newest message). Keep them if you
+  regenerate the native project before mob_new ships them. The iOS side of
+  MOB-481 comes from the local mob checkout.
 
 ## The app
 

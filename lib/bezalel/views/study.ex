@@ -25,7 +25,7 @@ defmodule Bezalel.Views.Study do
 
     ~MOB"""
     <Column weight={1} fill_width={true}>
-      <Scroll weight={1} background={:background}>
+      <Scroll id={"study-#{@conversation.id}"} anchor="bottom" weight={1} background={:background}>
         <Column
           padding_left={16}
           padding_right={16}
