@@ -51,11 +51,11 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 - `Bezalel.DesignGalleryScreen` (Settings → Design specimen) shows every
   plugin piece; `mix run --no-start scripts/design_tour.exs /tmp/tour <node>...`
   captures it in every theme × cover over dist.
-- `android/.../MobBridge.kt` carries mob_new's merged, unreleased MOB-477
-  (rounded clip, flexing `<Spacer/>`) and MOB-481 (`<Scroll anchor="bottom">`,
-  which Study uses to open at and follow the newest message). Keep them if you
-  regenerate the native project before mob_new ships them. The iOS side of
-  MOB-481 comes from the local mob checkout.
+- `android/.../MobBridge.kt` carries mob_new's MOB-477 (rounded clip,
+  flexing `<Spacer/>`) and MOB-481 (`<Scroll anchor="bottom">`, which Study
+  uses to open at and follow the newest message), from mob_new 0.6.10. Keep
+  them if you regenerate the native project. The iOS side of MOB-481 is in
+  mob 0.9.18.
 
 ## The app
 
@@ -73,9 +73,10 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   builder makes only the sermon outline and says so for anything else).
   Settings tells the user replies are scripted; sign-in says it isn't built.
   A real model plugs in behind those behaviours, not in the views.
-- mob is the local checkout (`{:mob, path: "../mob"}`, `mob_dir` in the
-  gitignored `mob.local.exs`): unreleased fixes are tried here before a
-  release. Switch back to the Hex version once they ship.
+- To try an unreleased mob fix here first, point the dep at the checkout
+  (`{:mob, path: "../mob", override: true}`) and set `mob_dir` to it in the
+  gitignored `mob.local.exs` (native builds read mob's sources from there);
+  go back to the Hex version once it ships.
 - Check changes on devices: deploy, then
   `mix run --no-start scripts/app_tour.exs /tmp/app <node>...` walks every tab
   and the main interactions and saves screenshots. Android sheets are separate

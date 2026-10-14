@@ -20,11 +20,9 @@ defmodule Bezalel.MixProject do
 
   defp deps do
     [
-      # Local mob (~/code/mob, master) until the next mob release: it carries
-      # MOB-479 (the light/dark watcher follows the OS), unreleased, checked
-      # here first. Native builds read mob's sources from the same checkout
-      # (mob_dir in mob.local.exs). Back to {:mob, "~> 0.9.x"} once released.
-      {:mob, path: "../mob", override: true},
+      # 0.9.18+: the light/dark watcher follows the OS (MOB-479) and
+      # <Scroll anchor="bottom"> renders on iOS (MOB-481).
+      {:mob, "~> 0.9.18"},
       # 0.7.25+: bundles a style package's fonts (mob_bezalel's) in dev and
       # release builds (MOB-476, MOB-480).
       {:mob_dev, "~> 0.7.25", only: :dev, runtime: false},
