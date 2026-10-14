@@ -52,8 +52,6 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   devices, deploy, then
   `mix run --no-start scripts/design_tour.exs /tmp/tour <node>...` captures
   every theme × cover over dist.
-- Until mob_dev ships MOB-476 (style packages bundling fonts), build with
-  `MOB_DEV_PATH=<mob_dev master checkout>`.
 - `android/.../MobBridge.kt` carries two renderer fixes ahead of mob_new
   (rounded clip after padding shaved glyphs; a bare `<Spacer/>` didn't
   flex). Keep them if you regenerate the native project before mob_new

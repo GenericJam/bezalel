@@ -21,7 +21,9 @@ defmodule Bezalel.MixProject do
   defp deps do
     [
       {:mob,     "~> 0.9.17"},
-      mob_dev_dep(),
+      # 0.7.25+: bundles a style package's fonts (mob_bezalel's) in dev and
+      # release builds (MOB-476, MOB-480).
+      {:mob_dev, "~> 0.7.25", only: :dev, runtime: false},
       # The design plugin (style package): Bezalel's themes, palette, fonts.
       {:mob_bezalel, path: "../mob_bezalel"},
       {:ecto_sqlite3, "~> 0.18"},
@@ -30,15 +32,6 @@ defmodule Bezalel.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.4.2", only: [:dev, :test], runtime: false}
     ]
-  end
-
-  # Style packages that ship fonts need a mob_dev that bundles a style's
-  # `assets.fonts`; MOB_DEV_PATH points at a local checkout until that's on Hex.
-  defp mob_dev_dep do
-    case System.get_env("MOB_DEV_PATH") do
-      nil -> {:mob_dev, "~> 0.7.12", only: :dev, runtime: false}
-      path -> {:mob_dev, path: path, only: :dev, runtime: false, override: true}
-    end
   end
 
   # Shorthands for the common mob workflows — `mix deploy` is `mix mob.deploy`,
