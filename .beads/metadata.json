@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "bezalel",
+  "project_id": "ff482f79-2615-4573-aceb-b5202943357b"
+}
