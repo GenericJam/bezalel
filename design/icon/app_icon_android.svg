@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 100 100">
+  <!-- Bezalel app icon: mark 2a (plumb bob + flame, "CHOSEN" in
+       Bezalel Brand.dc.html) on umber leather, gold-foil mark, gold stitching.
+       Android adaptive variant: leather full-bleed, stitching and mark scaled
+       into the launcher's 66% safe zone. -->
+  <defs>
+    <radialGradient id="sheen" cx=".32" cy=".22" r="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".45"/>
+    </radialGradient>
+    <linearGradient id="foil" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4DC98"/>
+      <stop offset=".42" stop-color="#C9A04A"/>
+      <stop offset=".7" stop-color="#8F6A25"/>
+      <stop offset="1" stop-color="#E3C277"/>
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".42" numOctaves="3" seed="7"/>
+      <feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.6 0 0 0 -0.55"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <filter id="emboss" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="1" stdDeviation=".6" flood-color="#000" flood-opacity=".6"/>
+    </filter>
+    <symbol id="m-pa" viewBox="0 0 100 100">
+      <path d="M49.2 0H50.8V21H49.2Z"/>
+      <path d="M44 21H56V28H44Z"/>
+      <path fill-rule="evenodd" d="M50 92L31 51C29 41 35 33 44 30L56 30C65 33 71 41 69 51ZM50 38C54 44 56.5 47.5 56.5 51.5C56.5 55.5 53.5 58 50 58C46.5 58 43.5 55.5 43.5 51.5C43.5 47.5 46 44 50 38ZM49.1 61H50.9V87H49.1Z"/>
+    </symbol>
+  </defs>
+  <rect width="100" height="100" fill="#3B2A1E"/>
+  <rect width="100" height="100" fill="url(#sheen)"/>
+  <rect width="100" height="100" fill="#000" opacity=".42" filter="url(#grain)"/>
+  <rect x="49.6" y="0" width=".8" height="35.6" fill="#C9A04A"/>
+  <g transform="translate(50 50) scale(.66) translate(-50 -50)"><rect x="6.5" y="6.5" width="87" height="87" rx="17" fill="none" stroke="#C9A04A" stroke-opacity=".6" stroke-width="1.2" stroke-dasharray="2.4 1.7"/>
+  
+  <use href="#m-pa" xlink:href="#m-pa" x="14" y="13" width="72" height="72" fill="url(#foil)" filter="url(#emboss)"/></g>
+</svg>

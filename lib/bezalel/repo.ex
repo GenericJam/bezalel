@@ -11,13 +11,17 @@ defmodule Bezalel.Repo do
     #   iOS     — NSDocumentDirectory    (app-private, iCloud-backed)
     #
     # When not running on device (e.g. mix ecto.migrate in dev), falls back to
-    # priv/repo/ in the project root so local development works without any setup.
-    data_dir =
-      System.get_env("MOB_DATA_DIR") ||
-        System.get_env("HOME") ||
-        Path.join(File.cwd!(), "priv/repo")
+    # priv/repo/ in the project root so local development works without any
+    # setup. A configured :database (config/test.exs) wins over both.
+    database =
+      config[:database] ||
+        Path.join(
+          System.get_env("MOB_DATA_DIR") || System.get_env("HOME") ||
+            Path.join(File.cwd!(), "priv/repo"),
+          "app.db"
+        )
 
-    File.mkdir_p!(data_dir)
-    {:ok, Keyword.merge(config, database: Path.join(data_dir, "app.db"), pool_size: 1)}
+    File.mkdir_p!(Path.dirname(database))
+    {:ok, Keyword.merge(config, database: database, pool_size: 1)}
   end
 end

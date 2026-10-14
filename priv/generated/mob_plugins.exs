@@ -5,12 +5,12 @@
 %{
   nifs: [],
   plugins: [],
-  styles: [%{name: :mob_bezalel, theme: MobBezalel.Dark}],
-  default_style: :mob_bezalel,
-  settings: [],
-  screens: [],
-  notification_handlers: [],
-  lifecycle: [],
+  composites: [],
   default_font: nil,
-  composites: []
+  default_style: :mob_bezalel,
+  lifecycle: [],
+  notification_handlers: [],
+  screens: [],
+  settings: [],
+  styles: [%{name: :mob_bezalel, theme: MobBezalel.Dark}]
 }

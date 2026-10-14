@@ -48,14 +48,38 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   `MobBezalel.UI` composites (bars, cards, pills, segmented control, blocks,
   composer, sheet style). Use those; don't hard-code hex or sizes in screens.
   Fix look problems in mob_bezalel, not per screen.
-- `Bezalel.DesignGalleryScreen` shows every piece. To check the plugin on
-  devices, deploy, then
-  `mix run --no-start scripts/design_tour.exs /tmp/tour <node>...` captures
-  every theme × cover over dist.
-- `android/.../MobBridge.kt` carries two renderer fixes ahead of mob_new
-  (rounded clip after padding shaved glyphs; a bare `<Spacer/>` didn't
-  flex). Keep them if you regenerate the native project before mob_new
-  includes them.
+- `Bezalel.DesignGalleryScreen` (Settings → Design specimen) shows every
+  plugin piece; `mix run --no-start scripts/design_tour.exs /tmp/tour <node>...`
+  captures it in every theme × cover over dist.
+- `android/.../MobBridge.kt` carries mob_new's merged MOB-477 (rounded clip,
+  flexing `<Spacer/>`), unreleased. Keep it if you regenerate the native
+  project before mob_new ships it.
+
+## The app
+
+- `Bezalel.AppScreen` is the whole app: Study, Conversations, Workshop (and a
+  built tool), Settings under one top bar and tab bar, plus the sheets and the
+  toast. It holds the state; each tab's view and events are in
+  `lib/bezalel/views/`. Events are `{:tap, {tab, event}}` tuples routed there.
+- Data: `Bezalel.Library` (SQLite: conversations, messages, tools; seeds the
+  design's Exodus 31 study on first run). Preferences: `Bezalel.Settings`
+  (`Mob.State`). Scripture and lexicon: `Bezalel.Scripture` (Exodus 31
+  sample). Models: `Bezalel.Models`.
+- The agent and the tool builder are seams: `Bezalel.Agent` and
+  `Bezalel.Workshop` behaviours, picked by `config :bezalel, :agent` /
+  `:builder`. Today both are the design's storyboard (scripted replies; the
+  builder makes only the sermon outline and says so for anything else).
+  Settings tells the user replies are scripted; sign-in says it isn't built.
+  A real model plugs in behind those behaviours, not in the views.
+- mob is the local checkout (`{:mob, path: "../mob"}`, `mob_dir` in the
+  gitignored `mob.local.exs`): unreleased fixes are tried here before a
+  release. Switch back to the Hex version once they ship.
+- Check changes on devices: deploy, then
+  `mix run --no-start scripts/app_tour.exs /tmp/app <node>...` walks every tab
+  and the main interactions and saves screenshots. Android sheets are separate
+  windows the in-app capture misses; use `adb exec-out screencap` for those.
+- Host tests (`mix test`) mount the screen with `Mob.ScreenCase` against a
+  temp database and temp `Mob.State`.
 
 If you use [usage_rules](https://hexdocs.pm/usage_rules), `mix usage_rules.sync`
 picks up `deps/mob/usage-rules.md`.

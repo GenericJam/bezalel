@@ -8,3 +8,5 @@ config :bezalel, ecto_repos: [Bezalel.Repo]
 # Wire the Repo into Mob.ScreenState so screens using `vsn:` get automatic
 # state persistence. Remove this line to disable screen state persistence.
 config :mob, :repo, Bezalel.Repo
+
+if config_env() == :test, do: import_config("test.exs")

@@ -7,6 +7,7 @@ defmodule Bezalel.DesignGalleryScreen do
   """
   use Mob.Screen
 
+  alias Mob.Theme.AdaptiveWatcher
   alias MobBezalel.{Palette, UI}
 
   @modes [
@@ -30,7 +31,7 @@ defmodule Bezalel.DesignGalleryScreen do
   ]
 
   def mount(_params, _session, socket) do
-    Mob.Theme.AdaptiveWatcher.register_adaptive(MobBezalel.System)
+    AdaptiveWatcher.register_adaptive(MobBezalel.System)
     # In System mode the screen re-resolves the theme itself on an OS flip:
     # the watcher updates the theme but doesn't repaint a screen that's
     # already showing, and a repaint racing it could keep the old palette.
@@ -61,11 +62,20 @@ defmodule Bezalel.DesignGalleryScreen do
 
     mode_index = Enum.find_index(@modes, fn {k, _} -> k == assigns.mode end)
     cover_index = Enum.find_index(Palette.covers(), &(&1 == assigns.cover))
-    tabs = for l <- ["Study", "Conversations", "Workshop", "Settings"], do: {l, {self(), :noop}}
     sheet_tap = {self(), :open_sheet}
     trailing = UI.bar_button("Word", sheet_tap, assigns.cover)
     draft_change = {self(), :draft}
     send_tap = {self(), :noop}
+
+    tabs =
+      for {l, icon} <- [
+            study: :study,
+            conversations: :conversations,
+            workshop: :workshop,
+            settings: :settings
+          ],
+          do: {l |> Atom.to_string() |> String.capitalize(), icon, {self(), :noop}}
+
     sheet_dismiss = {self(), :sheet_dismissed}
 
     sheet = UI.sheet_style()
