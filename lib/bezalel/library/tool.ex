@@ -8,13 +8,13 @@ defmodule Bezalel.Library.Tool do
   import Ecto.Changeset
 
   schema "tools" do
-    field(:name, :string)
-    field(:kind, :string)
-    field(:description, :string)
-    field(:data, :map)
-    field(:model, :string)
-    belongs_to(:conversation, Bezalel.Library.Conversation)
-    timestamps(type: :utc_datetime)
+    field :name, :string
+    field :kind, :string
+    field :description, :string
+    field :data, :map
+    field :model, :string
+    belongs_to :conversation, Bezalel.Library.Conversation
+    timestamps(type: :utc_datetime_usec)
   end
 
   @doc false

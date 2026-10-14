@@ -9,15 +9,15 @@ defmodule Bezalel.Library.Message do
   import Ecto.Changeset
 
   schema "messages" do
-    belongs_to(:conversation, Bezalel.Library.Conversation)
-    field(:position, :integer)
-    field(:role, Ecto.Enum, values: [:user, :agent])
-    field(:text, :string)
-    field(:blocks, {:array, :map}, default: [])
-    field(:passage, :string)
-    field(:image, :string)
-    field(:model, :string)
-    timestamps(type: :utc_datetime, updated_at: false)
+    belongs_to :conversation, Bezalel.Library.Conversation
+    field :position, :integer
+    field :role, Ecto.Enum, values: [:user, :agent]
+    field :text, :string
+    field :blocks, {:array, :map}, default: []
+    field :passage, :string
+    field :image, :string
+    field :model, :string
+    timestamps(type: :utc_datetime_usec, updated_at: false)
   end
 
   @fields [:conversation_id, :position, :role, :text, :blocks, :passage, :image, :model]

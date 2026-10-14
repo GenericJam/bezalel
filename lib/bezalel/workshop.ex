@@ -18,12 +18,24 @@ defmodule Bezalel.Workshop do
     "Saving it to your phone"
   ]
 
-  @callback build(description :: String.t(), on_step :: (non_neg_integer() -> any())) ::
-              {:ok, %{name: String.t(), kind: String.t(), data: map()}} | {:error, String.t()}
+  @callback build(
+              description :: String.t(),
+              model :: map(),
+              on_step :: (non_neg_integer() -> any())
+            ) ::
+              {:ok, %{name: String.t(), kind: String.t(), data: map(), by: String.t()}}
+              | {:error, String.t()}
+
+  @doc "Whether builds come from a real model (false for the storyboard)."
+  @callback live?() :: boolean()
 
   @doc "The build steps, in order."
   @spec steps() :: [String.t()]
   def steps, do: @steps
+
+  @doc "Whether builds come from a real model."
+  @spec live?() :: boolean()
+  def live?, do: impl().live?()
 
   @doc """
   Builds and saves a tool. `on_step.(index)` fires as each of `steps/0`
@@ -32,14 +44,15 @@ defmodule Bezalel.Workshop do
   @spec build(String.t(), integer() | nil, String.t(), (non_neg_integer() -> any())) ::
           {:ok, Library.Tool.t()} | {:error, String.t()}
   def build(description, conversation_id, model_id, on_step) do
-    with {:ok, spec} <- impl().build(description, on_step) do
+    with {:ok, spec} <- impl().build(description, Bezalel.Models.get(model_id), on_step) do
       on_step.(length(@steps) - 1)
+      {by, spec} = Map.pop(spec, :by)
 
       case Library.create_tool(
              Map.merge(spec, %{
                description: description,
                conversation_id: conversation_id,
-               model: model_id
+               model: by
              })
            ) do
         {:ok, tool} -> {:ok, tool}
@@ -54,23 +67,45 @@ end
 defmodule Bezalel.Workshop.Storyboard do
   @moduledoc """
   The design's tool build: a sermon outline for Exodus 31:1–11 (big idea and
-  three movements). Any other kind of tool needs a connected model.
+  three movements). It accepts a description that asks for a sermon outline
+  and names no book but Exodus; anything else needs a connected model, and
+  says so rather than handing back the Exodus outline.
   """
   @behaviour Bezalel.Workshop
 
+  # Every other book, so "Romans 12 sermon outline" isn't answered with Exodus.
+  @other_books ~w(genesis leviticus numbers deuteronomy joshua judges ruth samuel kings
+                  chronicles ezra nehemiah esther job psalm psalms proverbs ecclesiastes song
+                  isaiah jeremiah lamentations ezekiel daniel hosea joel amos obadiah jonah micah
+                  nahum habakkuk zephaniah haggai zechariah malachi matthew mark luke john acts
+                  romans corinthians galatians ephesians philippians colossians thessalonians
+                  timothy titus philemon hebrews james peter jude revelation)
+
   @impl true
-  def build(description, on_step) do
+  def live?, do: false
+
+  @impl true
+  def build(description, _model, on_step) do
     on_step.(0)
 
-    if String.contains?(String.downcase(description), ["sermon", "outline"]) do
+    if exodus_outline?(description) do
       on_step.(1)
       on_step.(2)
-      {:ok, %{name: "Sermon Outline", kind: "sermon_outline", data: outline()}}
+      {:ok, %{name: "Sermon Outline", kind: "sermon_outline", data: outline(), by: "storyboard"}}
     else
       {:error,
-       "Without a connected model the Workshop can only build the sermon outline. " <>
-         "Describe a sermon outline, or try again once a model is connected."}
+       "Without a connected model the Workshop can only build the design’s sermon outline for " <>
+         "Exodus 31. Ask for that, or try again once a model is connected."}
     end
+  end
+
+  defp exodus_outline?(description) do
+    words =
+      description
+      |> String.downcase()
+      |> String.split(Regex.compile!("[^\\p{L}]+", "u"), trim: true)
+
+    "sermon" in words and "outline" in words and not Enum.any?(words, &(&1 in @other_books))
   end
 
   defp outline do

@@ -4,20 +4,31 @@ defmodule Bezalel.Views.Conversations do
 
   alias Bezalel.Library
   alias Bezalel.Views.Helpers
+  alias Mob.Socket
   alias MobBezalel.UI
 
-  @doc "The Conversations body."
+  @page 30
+
+  @doc "Loads the first page of the shelf (on entering the tab)."
+  def load(socket) do
+    shelf = Library.list_conversations(limit: @page)
+    Socket.assign(socket, shelf: shelf, shelf_done: length(shelf) < @page)
+  end
+
+  @doc "The Conversations body: a lazy list, paged in as it scrolls."
   def render(assigns) do
-    rows = Enum.map(Library.list_conversations(), &row(&1, assigns.conversation.id))
+    rows = Enum.map(assigns.shelf, &row(&1, assigns.conversation.id))
     new_tap = {self(), {:convs, :new}}
+    more = {self(), {:convs, :more}}
 
     ~MOB"""
-    <Scroll weight={1} background={:background}>
+    <LazyList weight={1} background={:background} on_end_reached={more}>
       <Column
+        id="shelf-head"
         padding_left={18}
         padding_right={18}
         padding_top={22}
-        padding_bottom={22}
+        padding_bottom={8}
         gap={14}
         fill_width={true}
       >
@@ -37,9 +48,9 @@ defmodule Bezalel.Views.Conversations do
           line_height={1.5}
           text_color={:muted}
         />
-        {rows}
       </Column>
-    </Scroll>
+      {rows}
+    </LazyList>
     """
   end
 
@@ -51,30 +62,52 @@ defmodule Bezalel.Views.Conversations do
 
     meta = "#{c.kind} · #{Helpers.count(n, "message")}"
     tap = {self(), {:convs, {:open, c.id}}}
+    id = "conversation-#{c.id}"
 
     ~MOB"""
     <Box
-      background={:surface}
-      border_color={border}
-      border_width={1.5}
-      corner_radius={18}
-      padding={14}
+      id={id}
+      padding_left={18}
+      padding_right={18}
+      padding_top={7}
+      padding_bottom={7}
       fill_width={true}
-      on_tap={tap}
     >
-      <Row gap={14} align={:center} fill_width={true}>
-        <Column gap={3} weight={1}>
-          {UI.kicker(Helpers.when_label(c.inserted_at))}
-          <Text text={c.name} font={:display} text_size={18} text_color={:on_surface} />
-          <Text text={meta} text_size={12} text_color={:muted} />
-        </Column>
-        {UI.kicker(state, state_color)}
-      </Row>
+      <Box
+        background={:surface}
+        border_color={border}
+        border_width={1.5}
+        corner_radius={18}
+        padding={14}
+        fill_width={true}
+        on_tap={tap}
+      >
+        <Row gap={14} align={:center} fill_width={true}>
+          <Column gap={3} weight={1}>
+            {UI.kicker(Helpers.when_label(c.inserted_at))}
+            <Text text={c.name} font={:display} text_size={18} text_color={:on_surface} />
+            <Text text={meta} text_size={12} text_color={:muted} />
+          </Column>
+          {UI.kicker(state, state_color)}
+        </Row>
+      </Box>
     </Box>
     """
   end
 
   @doc "Handles a Conversations event."
+  def handle(:more, %{assigns: %{shelf_done: true}} = socket), do: {:noreply, socket}
+
+  def handle(:more, socket) do
+    page = Library.list_conversations(limit: @page, offset: length(socket.assigns.shelf))
+
+    {:noreply,
+     Socket.assign(socket,
+       shelf: socket.assigns.shelf ++ page,
+       shelf_done: length(page) < @page
+     )}
+  end
+
   def handle({:open, id}, socket) do
     case Library.get_conversation(id) do
       nil -> {:noreply, socket}

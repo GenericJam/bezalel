@@ -9,7 +9,11 @@ defmodule Bezalel.Agent do
   the Core Screens v2 design; the Settings model section says so.
   """
 
-  @type reply :: %{blocks: [map()], passage: String.t() | nil}
+  @typedoc """
+  A reply: its blocks, an optional cited passage, and `by`, who produced it
+  (a `Bezalel.Models` id, or `"storyboard"` for the script).
+  """
+  @type reply :: %{blocks: [map()], passage: String.t() | nil, by: String.t()}
 
   @callback reply(messages :: [Bezalel.Library.Message.t()], model :: map()) ::
               {:ok, reply()} | {:error, term()}

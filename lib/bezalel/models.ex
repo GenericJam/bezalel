@@ -88,6 +88,14 @@ defmodule Bezalel.Models do
     |> Enum.map(fn [first | _] = models -> {first.group, models} end)
   end
 
+  @doc """
+  Who a message or tool is attributed to: the model's name, or "Scripted
+  reply" for the design's storyboard.
+  """
+  @spec attribution(String.t() | nil) :: String.t()
+  def attribution("storyboard"), do: "Scripted reply"
+  def attribution(id), do: get(id).name
+
   @doc "Whether the model can draw images."
   @spec draws?(map()) :: boolean()
   def draws?(model), do: Map.get(model, :image, false)

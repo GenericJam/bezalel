@@ -52,8 +52,8 @@ defmodule Bezalel.Views.Study do
           />
           {rows}
           <Text
-            :if={@typing}
-            text={model.name <> " is replying…"}
+            :if={Helpers.replying?(assigns)}
+            text={replying_label(model)}
             font={:ui_medium}
             text_size={12}
             text_color={:muted}
@@ -88,10 +88,17 @@ defmodule Bezalel.Views.Study do
     """
   end
 
+  defp replying_label(model) do
+    if Agent.live?(), do: model.name <> " is replying…", else: "Scripted reply on its way…"
+  end
+
   defp switch_note(false, _model), do: []
 
   defp switch_note(true, model) do
-    label = "Now answering with " <> model.name
+    label =
+      if Agent.live?(),
+        do: "Now answering with " <> model.name,
+        else: model.name <> " chosen · replies stay scripted until it’s connected"
 
     ~MOB"""
     <Box align="center" fill_width={true}>
@@ -124,7 +131,6 @@ defmodule Bezalel.Views.Study do
   end
 
   defp message(%{role: :agent} = m, assigns, current_model) do
-    answered_by = Models.get(m.model)
     blocks = Enum.map(m.blocks, &block(m, &1, assigns.expanded))
 
     ~MOB"""
@@ -132,7 +138,7 @@ defmodule Bezalel.Views.Study do
       {blocks}
       {passage(m.passage)}
       {image(m, current_model)}
-      {actions(m, assigns, answered_by.name)}
+      {actions(m, assigns, Models.attribution(m.model))}
     </Column>
     """
   end
@@ -230,13 +236,13 @@ defmodule Bezalel.Views.Study do
 
   defp no_drawing(model) do
     text =
-      "#{model.name} doesn't draw images. You can switch for this one reply; the conversation stays put."
+      "#{model.name} doesn’t draw images. Switch to Gemini Pro to see this one; the conversation stays put."
 
     UI.card(
       [
         ~MOB(<Text text={text} text_size={14} line_height={1.5} text_color={:on_surface} />),
         UI.pill_button(
-          "Draw with Gemini Pro",
+          "Switch to Gemini Pro",
           {self(), {:study, :draw_with_image_model}},
           :outline,
           height: 36,
@@ -370,9 +376,16 @@ defmodule Bezalel.Views.Study do
   end
 
   def handle({:delete, id}, socket) do
-    if List.last(socket.assigns.messages).id == id,
-      do: {:noreply, delete(socket, id)},
-      else: {:noreply, Socket.assign(socket, sheet: {:confirm_delete, id}, menu: nil)}
+    case Enum.find(socket.assigns.messages, &(&1.id == id)) do
+      # Already gone (a double tap, or an event queued across a switch).
+      nil ->
+        {:noreply, Socket.assign(socket, :menu, nil)}
+
+      _m ->
+        if last?(socket.assigns.messages, id),
+          do: {:noreply, delete(socket, id)},
+          else: {:noreply, Socket.assign(socket, sheet: {:confirm_delete, id}, menu: nil)}
+    end
   end
 
   def handle({:confirm_delete, id}, socket),
@@ -406,7 +419,7 @@ defmodule Bezalel.Views.Study do
     desc =
       "A sermon outline helper for #{passage_ref(socket.assigns.messages)}: big idea, three movements, an illustration for each."
 
-    {:noreply, Socket.assign(socket, tab: :workshop, desc: desc, build: nil)}
+    {:noreply, socket |> Socket.assign(desc: desc, build: nil) |> Helpers.go(:workshop)}
   end
 
   def handle(:draw_with_image_model, socket) do
@@ -414,41 +427,60 @@ defmodule Bezalel.Views.Study do
     {:noreply, Socket.assign(socket, model_id: "gemini", switched: true)}
   end
 
-  @doc "Asks the agent for the next reply to the open conversation."
+  @doc """
+  Asks the agent for the next reply to the open conversation. The task is
+  bound to that conversation and the model chosen now: its result lands
+  there even if the user has moved on, and a second send doesn't cancel the
+  first (each reply is its own task).
+  """
   def respond(socket) do
+    %{id: conversation_id} = socket.assigns.conversation
     messages = socket.assigns.messages
     model = Helpers.model(socket)
+    replying = Map.update(socket.assigns.replying, conversation_id, 1, &(&1 + 1))
 
     socket
-    |> Socket.assign(:typing, true)
-    |> Socket.start_async(:reply, fn -> Agent.reply(messages, model) end)
+    |> Socket.assign(:replying, replying)
+    |> Socket.start_async({:reply, conversation_id, make_ref()}, fn ->
+      {model.id, Agent.reply(messages, model)}
+    end)
   end
 
-  @doc "Stores the agent's reply (`handle_async(:reply, ...)`)."
-  def replied({:ok, {:ok, reply}}, socket) do
-    {:ok, message} =
-      Library.add_message(socket.assigns.conversation, %{
-        role: :agent,
-        blocks: reply.blocks,
-        passage: reply.passage,
-        model: socket.assigns.model_id
-      })
+  @doc "Stores a reply (`handle_async({:reply, conversation_id, _}, ...)`)."
+  def replied(conversation_id, result, socket) do
+    replying =
+      Map.update(socket.assigns.replying, conversation_id, 0, &max(&1 - 1, 0))
 
-    expanded = MapSet.union(socket.assigns.expanded, Helpers.summaries_open([message]))
+    socket = Socket.assign(socket, :replying, replying)
+    current? = socket.assigns.conversation.id == conversation_id
 
-    socket
-    |> Socket.assign(typing: false, expanded: expanded)
-    |> Helpers.reload_messages()
+    with {:ok, {model_id, {:ok, reply}}} <- result,
+         %Library.Conversation{} = conversation <- Library.get_conversation(conversation_id),
+         {:ok, message} <-
+           Library.add_message(conversation, %{
+             role: :agent,
+             blocks: reply.blocks,
+             passage: reply.passage,
+             model: reply[:by] || model_id
+           }) do
+      if current? do
+        expanded = MapSet.union(socket.assigns.expanded, Helpers.summaries_open([message]))
+        socket |> Socket.assign(:expanded, expanded) |> Helpers.reload_messages()
+      else
+        socket
+      end
+    else
+      # The conversation went away meanwhile: nothing to add it to.
+      nil -> socket
+      _failed when current? -> Helpers.toast(socket, "No reply this time.", ask_again: true)
+      _failed -> socket
+    end
   end
 
-  def replied(_failed, socket) do
-    socket
-    |> Socket.assign(:typing, false)
-    |> Helpers.toast("No reply this time.", ask_again: true)
-  end
+  defp last?(messages, id), do: match?(%{id: ^id}, List.last(messages))
 
   defp delete(socket, id) do
-    last? = List.last(socket.assigns.messages).id == id
+    last? = last?(socket.assigns.messages, id)
 
     case Library.delete_message(id) do
       {:ok, m} ->
@@ -469,13 +501,14 @@ defmodule Bezalel.Views.Study do
 
   defp copy_text(%{role: :user, text: text}), do: text
 
-  defp copy_text(%{blocks: blocks, passage: passage}) do
+  defp copy_text(%{blocks: blocks, passage: passage, image: image}) do
     summary = for b <- blocks, b["id"] == "sum", do: b["first"] <> " " <> b["rest"]
 
     cited =
       if p = Scripture.passage(passage), do: ["#{p.text} (#{p.ref}, #{p.version})"], else: []
 
-    Enum.join(summary ++ cited, "\n\n")
+    drawing = if image, do: ["Image request: #{image}, Ex 37:17–24"], else: []
+    Enum.join(summary ++ cited ++ drawing, "\n\n")
   end
 
   defp passage_ref(messages) do

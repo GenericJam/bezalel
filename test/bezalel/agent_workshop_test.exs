@@ -23,6 +23,11 @@ defmodule Bezalel.AgentWorkshopTest do
     assert Enum.any?(blocks, &(&1["type"] == "TOOL CALL" and &1["first"] == "lexicon(H7307)"))
   end
 
+  test "the word sheet's question (the transliteration) finds the word too" do
+    {:ok, %{blocks: blocks, by: "storyboard"}} = ask("Tell me about “rûaḥ”")
+    assert Enum.find(blocks, &(&1["id"] == "sum"))["first"] =~ "H7307"
+  end
+
   test "any other question is placed in the commission of Bezalel" do
     {:ok, %{blocks: blocks}} = ask("What about Oholiab?")
     assert Enum.map(blocks, & &1["type"]) == ["THINKING", "SUMMARY"]
@@ -52,7 +57,12 @@ defmodule Bezalel.AgentWorkshopTest do
                &send(me, {:step, &1})
              )
 
-    assert %{name: "Sermon Outline", kind: "sermon_outline", model: "haiku", conversation_id: cid} =
+    assert %{
+             name: "Sermon Outline",
+             kind: "sermon_outline",
+             model: "storyboard",
+             conversation_id: cid
+           } =
              tool
 
     assert cid == c.id
@@ -64,10 +74,16 @@ defmodule Bezalel.AgentWorkshopTest do
   end
 
   test "without a model, any other tool is refused with a reason and nothing is saved" do
-    assert {:error, reason} =
-             Workshop.build("Reading plan: Lent, 40 days", nil, "sonnet", fn _ -> :ok end)
+    for desc <- [
+          "Reading plan: Lent, 40 days",
+          "Sermon manuscript for John 3",
+          "Romans 12 outline",
+          "Sermon outline for Romans 12"
+        ] do
+      assert {:error, reason} = Workshop.build(desc, nil, "sonnet", fn _ -> :ok end), desc
+      assert reason =~ "only build the design’s sermon outline"
+    end
 
-    assert reason =~ "only build the sermon outline"
     assert Library.tool_count() == 0
   end
 end

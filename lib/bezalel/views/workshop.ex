@@ -17,7 +17,7 @@ defmodule Bezalel.Views.Workshop do
   @doc "The Workshop body."
   def render(assigns) do
     model = Models.get(assigns.model_id)
-    tools = Library.list_tools()
+    tools = assigns.tools
     desc_change = {self(), :desc}
     build_tap = {self(), {:workshop, :build}}
     starters = for s <- @starters, do: UI.chip(s, {self(), {:workshop, {:starter, s}}})
@@ -110,8 +110,12 @@ defmodule Bezalel.Views.Workshop do
     """
   end
 
+  defp build_label(model) do
+    if Workshop.live?(), do: "Build with " <> model.name, else: "Build (scripted)"
+  end
+
   defp build_state(nil, model, tap) do
-    UI.pill_button("Build with " <> model.name, tap, :primary, height: 52, text_size: 16)
+    UI.pill_button(build_label(model), tap, :primary, height: 52, text_size: 16)
   end
 
   defp build_state({:failed, reason}, model, tap) do
@@ -120,12 +124,15 @@ defmodule Bezalel.Views.Workshop do
         [~MOB(<Text text={reason} text_size={14} line_height={1.5} text_color={:on_surface} />)],
         padding: 14
       ),
-      UI.pill_button("Build with " <> model.name, tap, :primary, height: 52, text_size: 16)
+      UI.pill_button(build_label(model), tap, :primary, height: 52, text_size: 16)
     ]
   end
 
   defp build_state({:step, current}, model, _tap) do
-    heading = String.upcase(model.name) <> " IS DRAFTING YOUR TOOL"
+    heading =
+      if Workshop.live?(),
+        do: String.upcase(model.name) <> " IS DRAFTING YOUR TOOL",
+        else: "DRAFTING YOUR TOOL (SCRIPTED)"
 
     steps =
       for {label, i} <- Enum.with_index(Workshop.steps()) do
@@ -176,7 +183,7 @@ defmodule Bezalel.Views.Workshop do
 
   @doc "A built tool's panel."
   def render_tool(assigns) do
-    tool = Library.get_tool(assigns.tool_id)
+    tool = assigns.tool
     data = tool.data
     discuss = {self(), {:tool, :discuss}}
     change = {self(), {:tool, :change}}
@@ -285,8 +292,7 @@ defmodule Bezalel.Views.Workshop do
   def handle({:starter, label}, socket),
     do: {:noreply, Socket.assign(socket, desc: label <> ": ", build: nil)}
 
-  def handle({:open_tool, id}, socket),
-    do: {:noreply, Socket.assign(socket, tab: :tool, tool_id: id, move_open: 0)}
+  def handle({:open_tool, id}, socket), do: {:noreply, Helpers.open_tool(socket, id)}
 
   def handle(:build, socket) do
     desc =
@@ -318,9 +324,17 @@ defmodule Bezalel.Views.Workshop do
     end
   end
 
-  @doc "The build finished (`handle_async(:build, ...)`)."
-  def built({:ok, {:ok, tool}}, socket),
-    do: Socket.assign(socket, tab: :tool, tool_id: tool.id, move_open: 0, build: nil, desc: "")
+  @doc """
+  The build finished (`handle_async(:build, ...)`). In the Workshop the new
+  tool opens; anywhere else the user stays put and a toast says it's ready.
+  """
+  def built({:ok, {:ok, tool}}, socket) do
+    socket = Socket.assign(socket, build: nil, desc: "")
+
+    if socket.assigns.tab == :workshop,
+      do: Helpers.open_tool(socket, tool.id),
+      else: Helpers.toast(socket, "#{tool.name} is built. It’s in the Workshop.")
+  end
 
   def built({:ok, {:error, reason}}, socket), do: Socket.assign(socket, :build, {:failed, reason})
 
@@ -334,16 +348,17 @@ defmodule Bezalel.Views.Workshop do
        Socket.assign(socket, :move_open, if(socket.assigns.move_open == i, do: -1, else: i))}
 
   def handle_tool(:discuss, socket) do
-    tool = Library.get_tool(socket.assigns.tool_id)
-
     conversation =
-      (tool && Library.get_conversation(tool.conversation_id)) || socket.assigns.conversation
+      Library.get_conversation(socket.assigns.tool.conversation_id) ||
+        socket.assigns.conversation
 
     {:noreply, Helpers.open_conversation(socket, conversation)}
   end
 
   def handle_tool(:change, socket) do
-    tool = Library.get_tool(socket.assigns.tool_id)
-    {:noreply, Socket.assign(socket, tab: :workshop, desc: tool.description, build: nil)}
+    {:noreply,
+     socket
+     |> Socket.assign(desc: socket.assigns.tool.description, build: nil)
+     |> Helpers.go(:workshop)}
   end
 end

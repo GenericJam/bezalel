@@ -131,7 +131,7 @@ defmodule Bezalel.Views.Sheets do
       ~MOB(<Wrap spacing={8} run_spacing={8} fill_width={true}>
   {refs}
 </Wrap>),
-      UI.pill_button("Ask #{model.name} about #{w.translit}", ask)
+      UI.pill_button(ask_label(model, w), ask)
     ]
   end
 
@@ -186,5 +186,11 @@ defmodule Bezalel.Views.Sheets do
       />
     </Box>
     """
+  end
+
+  defp ask_label(model, w) do
+    if Bezalel.Agent.live?(),
+      do: "Ask #{model.name} about #{w.translit}",
+      else: "Ask about #{w.translit}"
   end
 end

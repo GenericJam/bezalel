@@ -4,11 +4,13 @@ defmodule Bezalel.Library.Conversation do
   import Ecto.Changeset
 
   schema "conversations" do
-    field(:name, :string)
-    field(:kicker, :string)
-    field(:kind, :string)
-    has_many(:messages, Bezalel.Library.Message)
-    timestamps(type: :utc_datetime)
+    field :name, :string
+    field :kicker, :string
+    field :kind, :string
+    # The position the next message gets; never handed out twice.
+    field :next_position, :integer, default: 1
+    has_many :messages, Bezalel.Library.Message
+    timestamps(type: :utc_datetime_usec)
   end
 
   @doc false

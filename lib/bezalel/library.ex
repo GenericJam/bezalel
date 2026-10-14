@@ -11,17 +11,22 @@ defmodule Bezalel.Library do
 
   # ── Conversations ─────────────────────────────────────────────────────────
 
-  @doc "Conversations, most recently active first, each with its message count."
-  @spec list_conversations() :: [
+  @doc """
+  Conversations, most recently active first, each with its message count.
+  `opts`: `:limit`, `:offset` (paging the shelf).
+  """
+  @spec list_conversations(keyword()) :: [
           %{conversation: Conversation.t(), message_count: non_neg_integer()}
         ]
-  def list_conversations do
+  def list_conversations(opts \\ []) do
     from(c in Conversation,
       left_join: m in assoc(c, :messages),
       group_by: c.id,
       order_by: [desc: c.updated_at, desc: c.id],
       select: %{conversation: c, message_count: count(m.id)}
     )
+    |> limit(^Keyword.get(opts, :limit, -1))
+    |> offset(^Keyword.get(opts, :offset, 0))
     |> Repo.all()
   end
 
@@ -59,22 +64,23 @@ defmodule Bezalel.Library do
   @doc """
   Appends a message to a conversation and marks the conversation active.
   `attrs` takes `:role` plus `:text` (user) or `:blocks`, `:passage`,
-  `:image`, `:model` (agent).
+  `:image`, `:model` (agent). The position comes from the conversation's
+  counter, so a deleted message's slot is never handed out again.
   """
   @spec add_message(Conversation.t(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
-  def add_message(%Conversation{id: id} = conversation, attrs) do
+  def add_message(%Conversation{id: id}, attrs) do
     Repo.transact(fn ->
-      position =
-        (Repo.one(from(m in Message, where: m.conversation_id == ^id, select: max(m.position))) ||
-           0) + 1
+      # Claim the slot and mark the conversation active in one write.
+      {1, [position]} =
+        Repo.update_all(
+          from(c in Conversation, where: c.id == ^id, select: c.next_position - 1),
+          inc: [next_position: 1],
+          set: [updated_at: DateTime.utc_now()]
+        )
 
-      with {:ok, message} <-
-             %Message{}
-             |> Message.changeset(Map.merge(attrs, %{conversation_id: id, position: position}))
-             |> Repo.insert() do
-        touch(conversation)
-        {:ok, message}
-      end
+      %Message{}
+      |> Message.changeset(Map.merge(attrs, %{conversation_id: id, position: position}))
+      |> Repo.insert()
     end)
   end
 
@@ -160,7 +166,7 @@ defmodule Bezalel.Library do
         {:ok, _} =
           add_message(c, %{
             role: :agent,
-            model: Bezalel.Models.default(),
+            model: "storyboard",
             passage: "exodus-31-2-3",
             blocks: Storyboard.opening_blocks()
           })
@@ -168,20 +174,11 @@ defmodule Bezalel.Library do
         {:ok, _} = add_message(c, %{role: :user, text: "Show me the lampstand he made."})
 
         {:ok, _} =
-          add_message(c, %{role: :agent, model: Bezalel.Models.default(), image: "lampstand"})
+          add_message(c, %{role: :agent, model: "storyboard", image: "lampstand"})
 
         {:ok, c}
       end)
 
     conversation
-  end
-
-  # update_all, not a changeset on the caller's struct: that struct's
-  # updated_at is often already "now" to the second, and Ecto then sees no
-  # change and skips the write, so the shelf order wouldn't follow activity.
-  defp touch(%Conversation{id: id}) do
-    Repo.update_all(from(c in Conversation, where: c.id == ^id),
-      set: [updated_at: DateTime.utc_now(:second)]
-    )
   end
 end

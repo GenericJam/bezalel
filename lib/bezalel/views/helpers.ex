@@ -2,6 +2,7 @@ defmodule Bezalel.Views.Helpers do
   @moduledoc "Socket helpers shared by the tab views."
 
   alias Bezalel.{Library, Models, Settings}
+  alias Bezalel.Views.Conversations
   alias Mob.Socket
 
   @toast_ms 4000
@@ -30,7 +31,36 @@ defmodule Bezalel.Views.Helpers do
   @doc "The chosen model."
   def model(socket), do: Models.get(socket.assigns.model_id)
 
-  @doc "Opens a conversation in Study."
+  @doc """
+  Switches to `tab`, loading what it shows into assigns (renders don't
+  query): the shelf, the built tools, or the on-this-phone counts.
+  """
+  def go(socket, :convs), do: socket |> Socket.assign(:tab, :convs) |> Conversations.load()
+
+  def go(socket, :workshop),
+    do: Socket.assign(socket, tab: :workshop, tools: Library.list_tools())
+
+  def go(socket, :settings) do
+    Socket.assign(socket,
+      tab: :settings,
+      counts: %{conversations: Library.conversation_count(), tools: Library.tool_count()}
+    )
+  end
+
+  def go(socket, tab), do: Socket.assign(socket, :tab, tab)
+
+  @doc "Shows a built tool (the Workshop's tool view), or the Workshop if it's gone."
+  def open_tool(socket, id) do
+    case Library.get_tool(id) do
+      nil -> go(socket, :workshop)
+      tool -> Socket.assign(socket, tab: :tool, tool: tool, move_open: 0)
+    end
+  end
+
+  @doc """
+  Opens a conversation in Study. A toast from the previous one (its Undo and
+  Ask again act on that conversation) is dropped.
+  """
   def open_conversation(socket, conversation) do
     Settings.put_conversation_id(conversation.id)
     messages = Library.messages(conversation.id)
@@ -40,13 +70,16 @@ defmodule Bezalel.Views.Helpers do
       conversation: conversation,
       messages: messages,
       menu: nil,
-      typing: false,
+      toast: nil,
       switched: false,
       draft: ""
     )
     |> Socket.assign(:expanded, summaries_open(messages))
     |> Socket.assign(:tab, :study)
   end
+
+  @doc "Whether a reply to the open conversation is on its way."
+  def replying?(assigns), do: Map.get(assigns.replying, assigns.conversation.id, 0) > 0
 
   @doc "Summaries start open; thinking and tool calls folded (the design's default)."
   def summaries_open(messages) do

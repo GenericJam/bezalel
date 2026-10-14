@@ -2,7 +2,7 @@ defmodule Bezalel.Views.Settings do
   @moduledoc "The Settings tab: account, appearance, model, usage, what's on the phone."
   import Mob.Sigil
 
-  alias Bezalel.{Agent, Library, Models, Settings}
+  alias Bezalel.{Agent, Models, Settings}
   alias Bezalel.Views.Helpers
   alias Mob.Socket
   alias MobBezalel.{Palette, UI}
@@ -63,8 +63,8 @@ defmodule Bezalel.Views.Settings do
     on_phone =
       UI.card(
         [
-          device_row("Conversations", "#{Library.conversation_count()} stored", true),
-          device_row("Tools", "#{Library.tool_count()} built", true),
+          device_row("Conversations", "#{assigns.counts.conversations} stored", true),
+          device_row("Tools", "#{assigns.counts.tools} built", true),
           device_row("Bible text (BSB)", "Exodus 31 sample", false)
         ],
         padding: 0,
@@ -150,12 +150,12 @@ defmodule Bezalel.Views.Settings do
     UI.card(
       [
         ~MOB(<Text
-  text="Sign in with your model provider. It opens in your browser and returns here."
+  text="Sign in with your model provider through the browser. Not built yet: it comes with the model connection."
   text_size={14}
   line_height={1.5}
   text_color={:on_surface}
 />),
-        UI.pill_button("Sign in with browser", tap, :primary)
+        UI.pill_button("Sign in with browser", tap, :outline)
       ],
       padding: 14,
       gap: 10

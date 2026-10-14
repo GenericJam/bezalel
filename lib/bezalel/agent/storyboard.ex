@@ -2,8 +2,10 @@ defmodule Bezalel.Agent.Storyboard do
   @moduledoc """
   The scripted replies of the Core Screens v2 design, used until a model is
   connected. A question that mentions a word from `Bezalel.Scripture`'s
-  lexicon gets that word's entry (Hebrew, Strong's number, cross-references);
-  anything else gets a short reply placing it in Exodus 31:1–11.
+  lexicon (in English, transliterated, or Hebrew) gets that word's entry
+  (Hebrew, Strong's number, cross-references); anything else gets a short
+  reply placing it in Exodus 31:1–11. Replies are attributed to
+  `"storyboard"`, not to the chosen model, which the script ignores.
   """
   @behaviour Bezalel.Agent
 
@@ -19,7 +21,7 @@ defmodule Bezalel.Agent.Storyboard do
       |> Enum.reverse()
       |> Enum.find_value("", fn m -> if m.role == :user, do: m.text end)
 
-    {:ok, %{blocks: blocks_for(question), passage: nil}}
+    {:ok, %{blocks: blocks_for(question), passage: nil, by: "storyboard"}}
   end
 
   @doc "The opening reply of the Exodus 31 study (the design's first answer)."
@@ -51,10 +53,17 @@ defmodule Bezalel.Agent.Storyboard do
     phrase = quoted(question) || question
     low = String.downcase(question)
 
-    case Enum.find(Scripture.word_keys(), &String.contains?(low, &1)) do
+    case Enum.find(Scripture.word_keys(), &mentions?(low, question, &1)) do
       nil -> general(phrase)
       key -> about_word(phrase, Scripture.word(key))
     end
+  end
+
+  defp mentions?(low, question, key) do
+    w = Scripture.word(key)
+
+    String.contains?(low, key) or String.contains?(low, String.downcase(w.translit)) or
+      String.contains?(question, w.heb)
   end
 
   defp about_word(phrase, w) do

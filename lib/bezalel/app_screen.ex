@@ -42,7 +42,13 @@ defmodule Bezalel.AppScreen do
         draft: "",
         desc: "",
         build: nil,
-        tool_id: nil,
+        tool: nil,
+        tools: [],
+        shelf: [],
+        shelf_done: true,
+        counts: %{conversations: 0, tools: 0},
+        replying: %{},
+        switched: false,
         move_open: 0
       )
       |> Helpers.open_conversation(conversation)
@@ -80,8 +86,7 @@ defmodule Bezalel.AppScreen do
 
   defp top_bar(%{tab: :tool} = assigns) do
     back = UI.bar_button("Workshop", {self(), {:tab, :workshop}}, assigns.cover)
-    title = (Library.get_tool(assigns.tool_id) || %{name: "Tool"}).name
-    UI.top_bar(title, assigns.cover, trailing: back)
+    UI.top_bar(assigns.tool.name, assigns.cover, trailing: back)
   end
 
   defp top_bar(assigns) do
@@ -153,7 +158,7 @@ defmodule Bezalel.AppScreen do
   # ── Events ────────────────────────────────────────────────────────────────
 
   def handle_info({:tap, {:tab, tab}}, socket) do
-    {:noreply, Mob.Socket.assign(socket, tab: tab, sheet: nil, menu: nil)}
+    {:noreply, socket |> Mob.Socket.assign(sheet: nil, menu: nil) |> Helpers.go(tab)}
   end
 
   def handle_info({:tap, {:study, event}}, socket), do: Study.handle(event, socket)
@@ -162,9 +167,11 @@ defmodule Bezalel.AppScreen do
   def handle_info({:tap, {:tool, event}}, socket), do: Workshop.handle_tool(event, socket)
   def handle_info({:tap, {:settings, event}}, socket), do: SettingsView.handle(event, socket)
 
+  # The notice in Study ("Now answering with …") shows after any change of
+  # model, whichever tab it was made from, until the conversation changes.
   def handle_info({:tap, {:model, id}}, socket) do
     Settings.put_model(id)
-    switched = socket.assigns.tab == :study and id != socket.assigns.model_id
+    switched = id != socket.assigns.model_id
 
     {:noreply,
      Mob.Socket.assign(socket,
@@ -201,6 +208,8 @@ defmodule Bezalel.AppScreen do
 
   def handle_info(_message, socket), do: {:noreply, socket}
 
-  def handle_async(:reply, result, socket), do: {:noreply, Study.replied(result, socket)}
+  def handle_async({:reply, conversation_id, _ref}, result, socket),
+    do: {:noreply, Study.replied(conversation_id, result, socket)}
+
   def handle_async(:build, result, socket), do: {:noreply, Workshop.built(result, socket)}
 end

@@ -48,6 +48,28 @@ defmodule Bezalel.LibraryTest do
     assert four.position > three.position
   end
 
+  test "undoing the delete of the last message after a new one keeps both, in order" do
+    c = conversation!()
+    {:ok, _} = Library.add_message(c, %{role: :user, text: "one"})
+    {:ok, two} = Library.add_message(c, %{role: :user, text: "two"})
+    {:ok, deleted} = Library.delete_message(two.id)
+    {:ok, _} = Library.add_message(c, %{role: :user, text: "three"})
+
+    {:ok, _} = Library.restore_message(deleted)
+    assert Library.messages(c.id) |> Enum.map(& &1.text) == ["one", "two", "three"]
+  end
+
+  test "the shelf pages" do
+    for n <- 1..5, do: conversation!("Study #{n}")
+    first = Library.list_conversations(limit: 3)
+    rest = Library.list_conversations(limit: 3, offset: 3)
+
+    assert [_, _, _] = first
+    assert [_, _] = rest
+    ids = Enum.map(first ++ rest, & &1.conversation.id)
+    assert ids == Enum.map(Library.list_conversations(), & &1.conversation.id)
+  end
+
   test "a user message needs text" do
     c = conversation!()
     assert {:error, changeset} = Library.add_message(c, %{role: :user, text: nil})
