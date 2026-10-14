@@ -96,6 +96,32 @@ defmodule Bezalel.AppScreenTest do
     assert assigns(view).messages == []
   end
 
+  test "Ask again waits for a reply that's already on its way" do
+    view = mount_screen(AppScreen)
+    before = length(assigns(view).messages)
+    last = List.last(assigns(view).messages)
+    view = render_info(view, {:tap, {:study, {:delete, last.id}}})
+    view = render_info(view, {:change, :draft, "skill?"})
+    view = render_info(view, {:tap, {:study, :send}})
+    view = render_info(view, {:tap, {:study, :ask_again}})
+    view = render_async(view)
+
+    # The deleted reply's slot is gone; one question, one answer.
+    assert [:user, :agent] =
+             assigns(view).messages |> Enum.drop(before - 1) |> Enum.map(& &1.role)
+  end
+
+  test "a reply that finishes while the shelf is open shows on the shelf" do
+    view = mount_screen(AppScreen)
+    count = length(assigns(view).messages)
+    view = render_info(view, {:change, :draft, "skill?"})
+    view = render_info(view, {:tap, {:study, :send}})
+    view = render_info(view, {:tap, {:tab, :convs}})
+    view = render_async(view)
+
+    assert text(view) =~ "#{count + 2} messages"
+  end
+
   test "a delete's toast goes away with its conversation" do
     view = mount_screen(AppScreen)
     last = List.last(assigns(view).messages)
@@ -164,7 +190,7 @@ defmodule Bezalel.AppScreenTest do
   test "a build that finishes after the user left the Workshop doesn't pull them back" do
     view = mount_screen(AppScreen)
     view = render_info(view, {:tap, {:tab, :workshop}})
-    view = render_info(view, {:change, :desc, "Sermon outline for Exodus 31"})
+    view = render_info(view, {:tap, {:workshop, {:starter, "Sermon outline helper"}}})
     view = render_info(view, {:tap, {:workshop, :build}})
     view = render_info(view, {:tap, {:tab, :settings}})
     view = render_async(view)

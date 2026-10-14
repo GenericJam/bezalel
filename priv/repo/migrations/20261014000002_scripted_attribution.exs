@@ -26,6 +26,9 @@ defmodule Bezalel.Repo.Migrations.ScriptedAttribution do
     end
   end
 
-  # Which model each row named before is gone; nothing to restore.
-  def down, do: :ok
+  # Which model each row named before is gone, so this can't be undone.
+  def down do
+    raise Ecto.MigrationError,
+          "ScriptedAttribution is irreversible: the earlier model labels were overwritten"
+  end
 end

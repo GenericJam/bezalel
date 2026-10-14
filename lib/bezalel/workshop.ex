@@ -67,15 +67,13 @@ end
 defmodule Bezalel.Workshop.Storyboard do
   @moduledoc """
   The design's tool build: a sermon outline for Exodus 31:1–11 (big idea and
-  three movements). It accepts a request for a sermon outline whose only
-  passage, if any, is Exodus 31; anything else needs a connected model, and
-  says so rather than handing back the Exodus outline.
+  three movements). It builds only when asked for a sermon outline that
+  names Exodus 31 and no other passage; anything else needs a connected
+  model, and says so rather than handing back the Exodus outline.
   """
   @behaviour Bezalel.Workshop
 
-  # Other books, by name and common abbreviation, so "Sermon outline on Ruth"
-  # or "... for Jn 3" isn't answered with Exodus. Any chapter number other
-  # than Exodus 31's is caught separately.
+  # A backstop for the allowlist: other books named next to Exodus 31.
   @other_books ~w(genesis gen leviticus lev numbers num deuteronomy deut dt joshua josh
                   judges judg ruth samuel sam kings kgs chronicles chr ezra nehemiah neh
                   esther esth job psalm psalms ps prov proverbs ecclesiastes eccl song
@@ -83,8 +81,9 @@ defmodule Bezalel.Workshop.Storyboard do
                   joel amos obadiah obad jonah micah mic nahum nah habakkuk hab zephaniah zeph
                   haggai hag zechariah zech malachi mal matthew matt mt mark mk luke lk john jn
                   acts romans rom corinthians cor galatians gal ephesians eph philippians phil
-                  colossians col thessalonians thess timothy tim titus philemon hebrews heb
-                  james jas peter pet jude revelation rev)
+                  colossians col thessalonians thess timothy tim titus philemon phlm hebrews
+                  heb james jas peter pet jude revelation rev)
+
   @impl true
   def live?, do: false
 
@@ -105,14 +104,18 @@ defmodule Bezalel.Workshop.Storyboard do
 
   defp exodus_outline?(description) do
     low = String.downcase(description)
-    # Take out the one passage it knows (Exodus 31, Ex 31:2–3, ...); any
-    # number left over is some other passage.
-    rest =
-      Regex.replace(Regex.compile!("\\bex(odus)?\\.?\\s*31(:\\d+([–-]\\d+)?)?", "u"), low, " ")
+    # Exodus 31 however it's written: Exodus 31, Exod. 31, Ex 31:2–3,
+    # Exodus chapter 31, Exodus 31:1–31:11.
+    exodus_31 =
+      Regex.compile!(
+        "\\bex(od(us)?)?\\.?\\s*(chapter\\s*)?31\\b(:\\d+(\\s*[–-]\\s*(31:)?\\d+)?)?",
+        "u"
+      )
 
+    rest = Regex.replace(exodus_31, low, " ")
     words = String.split(rest, Regex.compile!("[^\\p{L}\\p{N}]+", "u"), trim: true)
 
-    "sermon" in words and "outline" in words and
+    rest != low and "sermon" in words and "outline" in words and
       not Enum.any?(words, &(&1 in @other_books or digit?(&1)))
   end
 

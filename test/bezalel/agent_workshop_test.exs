@@ -75,9 +75,12 @@ defmodule Bezalel.AgentWorkshopTest do
 
   test "the outline is built for Exodus 31 however the passage is written" do
     for desc <- [
-          "Sermon outline helper: ",
+          "Sermon outline helper: Exodus 31",
           "A sermon outline helper for Exodus 31:2–3: big idea, three movements",
-          "Sermon outline, Ex 31:1-11"
+          "Sermon outline, Ex 31:1-11",
+          "Sermon outline for Exod. 31",
+          "Sermon outline on Exodus chapter 31",
+          "Sermon outline, Exodus 31:1–31:11"
         ] do
       assert {:ok, _} = Workshop.build(desc, nil, "sonnet", fn _ -> :ok end), desc
     end
@@ -91,7 +94,11 @@ defmodule Bezalel.AgentWorkshopTest do
           "Sermon outline for Romans 12",
           "Sermon outline for Exodus 20",
           "Sermon outline for Jn 3",
-          "Sermon outline on Ruth"
+          "Sermon outline on Ruth",
+          "Sermon outline helper: ",
+          "Sermon outline for Canticles",
+          "Sermon outline for Exodus chapter thirty",
+          "Sermon outline for Exodus 31 and Phlm"
         ] do
       assert {:error, reason} = Workshop.build(desc, nil, "sonnet", fn _ -> :ok end), desc
       assert reason =~ "only build the design’s sermon outline"

@@ -290,7 +290,7 @@ defmodule Bezalel.Views.Workshop do
 
   @doc "Handles a Workshop event."
   def handle({:starter, label}, socket),
-    do: {:noreply, Socket.assign(socket, desc: label <> ": ", build: nil)}
+    do: {:noreply, Socket.assign(socket, desc: starter_text(label), build: nil)}
 
   def handle({:open_tool, id}, socket), do: {:noreply, Helpers.open_tool(socket, id)}
 
@@ -298,7 +298,7 @@ defmodule Bezalel.Views.Workshop do
     desc =
       case String.trim(socket.assigns.desc) do
         "" ->
-          "A sermon outline helper: give it a passage, it drafts a big idea and three movements I can edit."
+          "A sermon outline helper for Exodus 31: a big idea and three movements I can edit."
 
         text ->
           text
@@ -364,4 +364,8 @@ defmodule Bezalel.Views.Workshop do
      |> Socket.assign(desc: socket.assigns.tool.description, build: nil)
      |> Helpers.go(:workshop)}
   end
+
+  # The outline starter names the passage the storyboard builds for.
+  defp starter_text("Sermon outline helper"), do: "Sermon outline helper: Exodus 31"
+  defp starter_text(label), do: label <> ": "
 end

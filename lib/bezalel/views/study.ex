@@ -405,8 +405,11 @@ defmodule Bezalel.Views.Study do
     end
   end
 
-  def handle(:ask_again, socket),
-    do: {:noreply, socket |> Socket.assign(:toast, nil) |> respond()}
+  def handle(:ask_again, socket) do
+    if Helpers.replying?(socket.assigns),
+      do: {:noreply, Socket.assign(socket, :toast, nil)},
+      else: {:noreply, socket |> Socket.assign(:toast, nil) |> respond()}
+  end
 
   def handle({:word, key}, socket),
     do: {:noreply, Socket.assign(socket, sheet: {:word, key}, menu: nil)}
@@ -469,7 +472,11 @@ defmodule Bezalel.Views.Study do
            }) do
       if current? do
         expanded = MapSet.union(socket.assigns.expanded, Helpers.summaries_open([message]))
-        socket |> Socket.assign(:expanded, expanded) |> Helpers.reload_messages()
+
+        socket
+        |> Socket.assign(:expanded, expanded)
+        |> Helpers.reload_messages()
+        |> Helpers.refresh()
       else
         Helpers.refresh(socket)
       end
