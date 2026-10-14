@@ -57,6 +57,14 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   them if you regenerate the native project. The iOS side of MOB-481 is in
   mob 0.9.18.
 
+## The plan
+
+- `PLAN.md` is the agreed plan for the real agent (rho, the study database
+  and tools, Dyn). Its work is tracked in beads: `bd ready` for what's next,
+  `bd show <id>` for details. Epics: phase 1 `bezalel-23s` (rho), 2
+  `bezalel-e47` (database), 3 `bezalel-czj` (tools), 4 `bezalel-y77` (app),
+  5 `bezalel-lac` (store review), 6 `bezalel-qyv` (Workshop on Dyn).
+
 ## The app
 
 - `Bezalel.AppScreen` is the whole app: Study, Conversations, Workshop (and a
