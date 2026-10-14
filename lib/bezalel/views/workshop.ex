@@ -139,7 +139,7 @@ defmodule Bezalel.Views.Workshop do
         else: "BUILDING THE SAMPLE (SCRIPTED)"
 
     steps =
-      for {label, i} <- Enum.with_index(Workshop.steps()) do
+      for {label, i} <- Enum.with_index(step_labels()) do
         fill = if current > i, do: :secondary, else: :surface
         color = if current >= i, do: :on_surface, else: :muted
 
@@ -171,6 +171,13 @@ defmodule Bezalel.Views.Workshop do
       padding: 16,
       gap: 12
     )
+  end
+
+  # The storyboard doesn't read the request, so its first step says what it does.
+  defp step_labels do
+    if Workshop.live?(),
+      do: Workshop.steps(),
+      else: List.replace_at(Workshop.steps(), 0, "Opening the sample")
   end
 
   # Without a model the builder ignores the description; say so up front.

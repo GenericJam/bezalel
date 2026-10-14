@@ -10,8 +10,8 @@ defmodule Bezalel.Views.Conversations do
   @page 30
 
   @doc """
-  Loads the shelf: the first page on entering the tab, or as many rows as
-  are already paged in when something changed underneath it.
+  Loads the shelf: as many rows as are already paged in, at least one page
+  (on entering the tab, or when something changed underneath it).
   """
   def load(socket) do
     limit = max(length(socket.assigns.shelf), @page)

@@ -178,6 +178,9 @@ defmodule Bezalel.AppScreenTest do
     view = render_info(view, {:tap, {:study, :build_from_chat}})
     assert assigns(view).tab == :workshop
     assert assigns(view).desc =~ "Exodus 31:2–3"
+    # Without a model, the Workshop says what the build will make before it starts.
+    assert text(view) =~ "Build the sample"
+    assert text(view) =~ "No model is connected, so this builds the design’s sample"
 
     view = render_info(view, {:tap, {:workshop, :build}})
     view = render_async(view)
