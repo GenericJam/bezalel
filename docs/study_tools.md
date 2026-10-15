@@ -50,9 +50,10 @@ database, 53 calls across the nine tools): every difference is one listed here, 
 `find_similar_passages` matched exactly once their handler was given the precomputed
 neighbours.
 
-- `lookup_verse`: no Torah weave hint (`get_torah_weave` is tier 2), no textual-variant or
-  NT↔OT quotation hints (no data in the packs); the cross-reference hint names only the
-  TSK. Their verse-table-missing message is gone (a missing core pack is the pack error).
+- `lookup_verse`: no Torah weave, textual-variant or NT↔OT quotation hints: the tools
+  they point to (`get_torah_weave`, `get_textual_variant`) are tier 2. The data is in the
+  packs since data version 1 (`textual_*` and `nt_ot_lxx_quote_hints` in notes), so tier 2
+  can bring the hints back. The cross-reference hint names only the TSK. Their verse-table-missing message is gone (a missing core pack is the pack error).
 - `get_cross_references`: the core pack's only dataset is the Treasury of Scripture
   Knowledge (Harrison/Romhild isn't built; Gage/Bradley and Burnett are excluded), so the
   description, the `source` enum and the legend name only the TSK. The ranking is theirs
@@ -91,7 +92,8 @@ packs instead of filling in from memory. The tool guidance covers the nine tier 
 Left out: the "Reading Scripture in its ancient context" section (populated divine realm,
 derivation hierarchy, hourglass narrative, 1 Enoch, "recovery not novelty") and the
 guidance for integrating ANE context. These present one school's framework (largely
-Heiser's, whose material the packs exclude) as the default reading, and lean on
+Heiser's; his summaries are in the notes pack since data version 1, but as one voice
+among several) as the default reading, and lean on
 `get_ane_context`, a tier 2 tool. A general study companion for pastors of different
 traditions should not take a side there by default. The translation-shift point (check
 *nephesh*, *ruach* in their Hebrew range) stays, as a word-study habit.
@@ -116,4 +118,5 @@ against the real packs.
 - `ancient` uses FTS5; check the phone's exqlite build has it.
 - If ANE context comes back, its prompt guidance should present it as background with
   its sources, not as the default reading frame.
-- No data for `get_textual_variant` (excluded material).
+- `get_textual_variant`: its 30 cases are in the notes pack (Heiser's data, restored in
+  data version 1); the hints in `lookup_verse` can come back with it.
