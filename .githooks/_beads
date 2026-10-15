@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# .githooks/_beads <hook> [args...] — run beads' own hook for <hook>, if bd is
+# set up here, passing the arguments and stdin through. Every hook in this
+# directory calls it first, so `git config core.hooksPath .githooks` keeps
+# beads' hooks (.beads/hooks/, managed by `bd hooks install --beads`) working.
+hook="$1"
+shift
+shim="$(git rev-parse --show-toplevel)/.beads/hooks/$hook"
+[ -x "$shim" ] || exit 0
+exec "$shim" "$@"

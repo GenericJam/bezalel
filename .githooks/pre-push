@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# .githooks/pre-push — Bezalel's push gate, after mob's (mob/.githooks/pre-push).
+# Activate once per clone or worktree: `git config core.hooksPath .githooks`
+# (or `mix setup`).
+#
+#   ALWAYS (blocking):
+#     mix format --check-formatted
+#     mix credo --strict
+#     mix compile --warnings-as-errors
+#     mix test     (the suite is ~15 s here; CI runs it too, this catches it
+#                   before a public push)
+#
+#   ALWAYS, ADVISORY (never blocks):
+#     how far behind origin/master this branch is
+#     whether code changed without any test changing
+set -euo pipefail
+
+# git pipes "<local_ref> <local_sha> <remote_ref> <remote_sha>" lines on stdin;
+# keep them for beads' hook and for ours.
+refs=$(cat)
+printf '%s\n' "$refs" | "$(dirname "$0")/_beads" pre-push "$@"
+
+echo "[pre-push] format..."
+mix format --check-formatted
+echo "[pre-push] credo..."
+mix credo --strict
+echo "[pre-push] compile (--warnings-as-errors)..."
+mix compile --warnings-as-errors
+echo "[pre-push] test..."
+mix test
+
+zero=0000000000000000000000000000000000000000
+push_range=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "${local_sha:-}" ] && continue
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then
+        push_range="origin/master..$local_sha"
+    else
+        push_range="$remote_sha..$local_sha"
+    fi
+done <<< "$refs"
+
+if git fetch --quiet origin master 2>/dev/null; then
+    behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo 0)
+    if [ "${behind:-0}" -gt 0 ]; then
+        echo "[pre-push] note: this branch is $behind commit(s) behind origin/master."
+    fi
+fi
+
+if [ -n "$push_range" ]; then
+    changed=$(git diff --name-only "$push_range" 2>/dev/null || true)
+    code=$(printf '%s\n' "$changed" | grep -E '^(lib|src|ios|android|priv)/' || true)
+    tests=$(printf '%s\n' "$changed" | grep -E '^test/' || true)
+    if [ -n "$code" ] && [ -z "$tests" ]; then
+        echo "[pre-push] note: code changed, no test changed in this push:"
+        printf '%s\n' "$code" | sed 's/^/[pre-push]       /' | head -10
+        echo "[pre-push]       Fine for a refactor or a doc string; otherwise, add the test now."
+    fi
+fi
+
+echo "[pre-push] ✓ all checks passed"

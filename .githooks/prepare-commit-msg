@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Beads' prepare-commit-msg hook only (see .githooks/_beads).
+exec "$(dirname "$0")/_beads" prepare-commit-msg "$@"

@@ -1,8 +1,221 @@
-# AGENTS.md: bezalel
+# Bezalel — Agent Instructions
 
-Bezalel is a [Mob](https://hexdocs.pm/mob) app: Elixir on the BEAM,
-running on the phone, rendering native SwiftUI / Jetpack Compose views. Screens
-live in `lib/bezalel/`; `lib/bezalel/app.ex` starts the app.
+You're in **bezalel**, a free Bible-study app for Android and iOS built with
+[Mob](https://hexdocs.pm/mob): Elixir on the BEAM, running on the phone,
+rendering native SwiftUI / Jetpack Compose views, with an on-phone agent
+(rho) and Hebrew/Greek study tools over downloaded SQLite packs. Read this
+file in full before you change anything. Its policies come from mob's
+AGENTS.md, adapted for an app; `~/AGENTS.md` (devices, Codex review, CI,
+Muster) applies on top.
+
+> **Keep this file up to date** in the same commit as the change it
+> describes. See "Keep this file up to date" at the end.
+
+## Repo topology
+
+| Repo | What | Where it comes from in `mix.exs` |
+|---|---|---|
+| **bezalel** (this, GitHub GenericJam/bezalel, public) | the app; `data/` builds the study packs | — |
+| **mob_bezalel** (GenericJam/mob_bezalel) | the style package: themes, palette, fonts, UI composites | GitHub, pinned (`sibling/3`) |
+| **rho** (GenericJam/rho) | agent core: loop, sessions, tools, sign-in, Dyn | GitHub, pinned until on Hex |
+| **mob_secure_store** (GenericJam/mob_secure_store) | Keychain / Keystore secrets plugin | GitHub, pinned until on Hex |
+| mob, mob_dev | the framework | Hex |
+
+`BEZALEL_LOCAL_DEPS=1` uses the sibling checkouts (`../rho` etc.) instead of
+the pins; push the sibling, then bump the SHA. Study data is published to R2
+at https://bezalel.genericjam.com/packs/manifest.json (`data/README.md`).
+
+## Issue tracking
+
+- **This app: beads** (`bd ready`, `bd show <id>`, `bd create`). The plan is
+  `PLAN.md`; its epics are listed under "The plan" below.
+- **A gap in mob / mob_dev / mob_new** found while working here: a Linear
+  issue (MOB-*, API key in `~/code/mob/.env`, see `~/AGENTS.md`). Linear's
+  free tier was full on 2026-10-15; if `issueCreate` fails with
+  `USAGE_LIMIT_EXCEEDED`, file a GitHub issue on the framework repo and a
+  bead here pointing at it.
+- **A gap in rho, mob_bezalel, mob_secure_store**: a bead here (they have no
+  tracker of their own yet), labelled with the repo.
+
+## Worktrees and parallel agents
+
+Several agents often work in this tree at once (the orchestrator splits work
+by area). The rules that keep them from damaging each other:
+
+- **Stay in your area.** Before editing a file another agent owns, message it.
+- **Commit with a pathspec, always:** `git add <your paths>`, check
+  `git diff --cached --stat`, then `git commit -m "…" -- <your paths>`. Never
+  `git commit -a`, `git add -A`, or a bare `git commit`: a bare commit takes
+  everything staged, including another agent's staged work (this happened:
+  a deps commit swept up a staged deletion from the data agent and left a
+  commit whose `data/build.sh` read a file it had deleted). The pre-commit
+  hook prints what you're about to commit; read it.
+- **Pushing** is done by the orchestrator or the human after review, not by
+  each agent, unless told otherwise.
+- For long work with no parallel agents, a git worktree
+  (`git worktree add ../bezalel-worktrees/<name> -b <branch>`) is fine; run
+  `mix setup` in it (hooks are per worktree).
+
+## Verification fidelity ladder
+
+Run every applicable lower rung, plus the highest rung the change reaches.
+Then say which rung you stopped at. "Tests pass" is not a claim about a device.
+
+1. **Static.** `mix format --check-formatted`, `mix credo --strict` (ExSlop
+   included), `mix compile --warnings-as-errors`.
+2. **Host.** `mix test`. Proves the Elixir logic, nothing about rendering,
+   NIFs, the native build or either platform.
+3. **Emulator and simulator, both platforms.** Deployed, attached over dist,
+   driven through `Mob.Test` (read `assigns/1` back after the action). For
+   UI, a screenshot as well.
+4. **Physical device.** Kevin's phones (e.g. moto g power 2021, ZY22DP6HFL);
+   lease first. An API-level crash on an old Android or a real-device-only
+   iOS behaviour is invisible below this rung.
+5. **Release build.** Different linkage and packaging (iOS release links
+   NIFs by a separate path).
+6. **Published artifact.** What the store or the pack host serves, not the
+   working tree (`data/scripts/publish.py` verifies the served packs for
+   this reason).
+
+- **Never substitute a lower rung because a higher one is slow or broken.**
+  Say plainly that the rung was unavailable and why.
+- **Verify effects, not exit codes.** After a deploy, prove the app is up and
+  answering (the screen module over dist, the md5 of a changed module)
+  before believing anything else. A `&&` chain after `mix test` is not a
+  gate unless `mix test`'s exit code is what decides.
+
+## When the ladder can't be climbed, propose the missing readback
+
+If you can't see a state as text (an iOS file attribute, a native view's
+layout, a download's progress), don't settle for a screenshot or "looks
+right". Ask for the smallest readback that would expose it (a NIF, a
+`Mob.Test` helper, a query function) and file it where it belongs (Issue
+tracking above). If it's small, ship it with the work that revealed the gap.
+When you build a subsystem here (the packs manager, the image pipeline),
+design its introspection up front: status functions, events a test can
+subscribe to.
+
+## Trust the instrument last
+
+- A number better than the theory allows is a bug in the measurement.
+- Make a probe fail loudly when its own precondition doesn't hold (a check
+  that passes against the previously installed build proves nothing).
+- Corroborate against something you didn't build: logcat, the platform's own
+  counters, a download served by the real host.
+- When you report a number that turns out wrong, retract it in place.
+
+## Pre-empt-failure rules
+
+Things that already bit this app. Not optional.
+
+1. **No compile-time `~r` regex in `lib/`.** A regex compiled into a module is
+   tied to the OTP that compiled it; phones run another. Compile at run time
+   (`Bezalel.Study.Patterns`, cached in `:persistent_term` under a key that
+   includes a hash of the sources so a hot load picks up changes). The
+   pre-commit hook and CI reject new ones.
+2. **Commit with a pathspec** (Worktrees above).
+3. **Tests that change global state are not async.** `Application.put_env`,
+   `System.put_env`, `:persistent_term`, the shared in-memory credential store
+   (`Bezalel.Test.MemoryStore`), `Mob.State`: a module that changes one runs
+   `async: false` and restores it, and a module that reads one clears or sets
+   it in its own setup instead of trusting the previous module. Two flakes
+   came from this (a packs test repointing `:study_packs_dir` under async
+   study tests; an API key left by LiveAgentTest showing a "Remove" button in
+   StudyLibraryTest).
+4. **A stopped process can still be in the Registry for a moment.**
+   `Registry.lookup` right after a `terminate_child` may return the dead pid;
+   check `Process.alive?` (see `Bezalel.Agent.Live.whereis/1`).
+5. **Phone SQLite is exqlite's build with exqlite's defines** (MOB-487, from
+   mob_dev 0.7.29 / mob_new 0.6.13; Android's own `build.zig` and
+   `CMakeLists.txt` carry the list). That includes `SQLITE_DQS=0`:
+   double-quoted string literals are an error on the phone as on the host.
+   Before MOB-487 FTS5 was missing on device: a host test passing proves
+   nothing about a SQLite feature on the phone.
+6. **On iOS `Mob.data_dir()` is Documents, which iCloud backs up.** Never put
+   re-downloadable data there (Apple rejects it); see `bezalel-lac.3`.
+7. **A native reinstall clears the app's data**, packs included.
+8. **Default arguments evaluate eagerly** (from mob): `System.get_env("X",
+   Path.expand("~/…"))` calls `System.user_home!()` every time, which raises
+   on Android. Use `case`/`||`.
+
+## Tests are part of the change
+
+New behaviour ships with a test unless a test would only restate the change
+(a rename, a doc string). The bar: **would this test fail if the fix were
+reverted?** Check by reverting it. A test that passes either way is worse than
+none, because it is claimed as evidence. For a flake, find the cause; a retry
+or a sleep is not a fix. Run the full suite in a loop (10+ runs) after a
+change to anything concurrent.
+
+## Commit workflow
+
+### Before every commit
+
+```bash
+mix format
+mix credo --strict                # whole tree; new issues (tests too) must be fixed
+mix compile --warnings-as-errors
+mix test                          # full suite; name any pre-existing flake explicitly
+```
+
+Native changes (`ios/`, `android/`, a plugin's NIF): `mix mob.deploy
+--native` on both platforms and verify on device before committing. Changes
+under `data/`: `data/build.sh` (or say why not) and the pack checks.
+
+### Decision log
+
+Non-obvious decisions (tradeoffs, workarounds, conventions, "why X and not
+Y") go in `decisions/`, one file each, `YYYY-MM-DD-short-slug.md`, with
+Context / Decision / Consequences. Append; never rewrite a decision (add a
+new file and mark the old `Status: superseded by <file>`; correct a factual
+error in place with a note). Before committing ask both: does this need a new
+record, and does it **invalidate** an existing one (grep `decisions/` for the
+mechanism you changed)?
+
+### Adversarial review before the commit
+
+Non-trivial work gets a review by a **separate agent** before it's committed:
+Codex first (`codex exec -s read-only -C <repo> -o /tmp/<name>-review.md -
+< prompt.md`, per `~/AGENTS.md`), a `reviewer` subagent if Codex fails. Give
+it the exact diff (with its base), what the change claims, and what you're
+least sure of; ask for `file:line`, blocking / should-fix / nitpick, and
+SHIP / DO NOT SHIP. Fix and re-review until clean, and say which reviewer
+gave the verdict. Skip it only for mechanical changes (formatting, a typo, a
+changelog line). Size is not a reason to skip.
+
+### Before a push
+
+- The pre-push hook passed (it runs the full gate).
+- The branch isn't behind origin/master (the hook says).
+- **Cross-repo claims are true now**: a pin or a doc naming a sibling's
+  commit or version requires that commit pushed or that version published.
+- After the push, watch CI (`gh run list -R GenericJam/bezalel -L 1`,
+  `gh run watch <id> --exit-status`) and fix red before moving on.
+
+## Hooks and CI
+
+`mix setup` (deps plus `git config core.hooksPath .githooks`) once per clone
+or worktree. `.githooks/`:
+
+- **pre-commit** (blocking, seconds): format check on staged Elixir files; no
+  new compile-time `~r` in `lib/`; no build output or local state staged
+  (`.wrangler/`, `data/out/`, `data/work/`, `*.sqlite` outside
+  `test/fixtures/`); prints the staged paths.
+- **pre-push** (blocking): format, `credo --strict`, compile with warnings as
+  errors, `mix test`; advisory notes on staleness and code-without-tests.
+- Each hook runs beads' own hook first (`.githooks/_beads` →
+  `.beads/hooks/`), so `bd` keeps working with the custom hooks path.
+
+CI (`.github/workflows/test.yml`) runs the same gate on every push and PR.
+`--no-verify` is for emergencies you report, not for convenience.
+
+## Releases
+
+Bezalel isn't published to a store yet; store readiness is epic
+`bezalel-lac` (bundle id, iCloud backup, review notes). Framework releases
+(mob, mob_dev, mob_new) follow mob's RELEASE.md and need Kevin's go-ahead.
+Study data releases: `data/scripts/publish.py` (immutable `packs/v<N>/`, the
+manifest last).
 
 ## Where Mob's docs are
 
@@ -180,6 +393,21 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 
 If you use [usage_rules](https://hexdocs.pm/usage_rules), `mix usage_rules.sync`
 picks up `deps/mob/usage-rules.md`.
+
+## Keep this file up to date
+
+The next agent's first decision comes from this file. When you change
+something it describes (topology, a convention, a gotcha, a workflow, a dev
+step), update it in the same commit, not in a follow-up. When something bites
+you that should have been a pre-empt rule, add it with a one-line summary and
+the commit or test that shows it.
+
+## Beads profile for this repo
+
+The managed beads blocks below describe bd's defaults. Here: agents use `bd`
+for tracking (the orchestrator may keep it read-only for subagents), commit
+their own paths after the gates and review (Commit workflow above), and leave
+pushing and Dolt sync to the orchestrator or the human unless told otherwise.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:6cd5cc61 -->
 ## Beads Issue Tracker

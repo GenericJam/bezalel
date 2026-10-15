@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Beads' post-checkout hook only (see .githooks/_beads).
+exec "$(dirname "$0")/_beads" post-checkout "$@"

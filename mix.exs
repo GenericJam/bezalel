@@ -67,6 +67,10 @@ defmodule Bezalel.MixProject do
   # --device <udid>` works as expected.
   defp aliases do
     [
+      # First thing in a fresh clone or worktree: deps and the repo's git
+      # hooks (.githooks: format/regex/build-output checks on commit, the full
+      # gate on push, and beads' own hooks).
+      setup: ["deps.get", "cmd git config core.hooksPath .githooks"],
       connect: ["mob.connect"],
       deploy: ["mob.deploy"],
       watch: ["mob.watch"],
