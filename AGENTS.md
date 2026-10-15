@@ -137,6 +137,12 @@ Things that already bit this app. Not optional.
 8. **Default arguments evaluate eagerly** (from mob): `System.get_env("X",
    Path.expand("~/…"))` calls `System.user_home!()` every time, which raises
    on Android. Use `case`/`||`.
+9. **iOS simulators share one BEAM directory per app on the Mac**
+   (`~/.mob/runtime/ios-sim/bezalel/`). Two agents deploying to different
+   simulators from different checkouts overwrite each other's BEAMs
+   (GenericJam/mob_dev#144; it happened on 2026-10-15). Deploy with your own
+   `MOB_SIM_RUNTIME_DIR=/tmp/<you>-ios-runtime` whenever another agent might
+   use a simulator, and prove the build on the node after a deploy.
 
 ## Tests are part of the change
 
