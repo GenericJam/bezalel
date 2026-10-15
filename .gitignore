@@ -46,3 +46,9 @@ xcuserdata/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Study database build (data/build.sh): checkout, downloads, outputs
+/data/work/
+/data/out/
+/data/.venv/
+/data/scripts/__pycache__/

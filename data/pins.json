@@ -1,0 +1,56 @@
+{
+  "python": "3.12.11",
+  "studybible_mcp": {
+    "repo": "https://github.com/djayatillake/studybible-mcp",
+    "commit": "38cef28dc2d7c1e834cbd5248edc0f65843e7819"
+  },
+  "git_sources": {
+    "aquifer_study_notes": {
+      "repo": "https://github.com/BibleAquifer/AquiferOpenStudyNotes",
+      "commit": "bbb3f86016cd20913f410a95af63d9f7ff9a71d6",
+      "paths": ["eng/json"]
+    },
+    "aquifer_dictionary": {
+      "repo": "https://github.com/BibleAquifer/AquiferOpenBibleDictionary",
+      "commit": "4d92a9ac29f41544cf5e70584f6f9fbee877a7df",
+      "paths": ["eng/json"]
+    },
+    "aquifer_translation_notes_uw": {
+      "repo": "https://github.com/BibleAquifer/UWTranslationNotes",
+      "commit": "dbfb46e027ee0807563918f4b95c80879cc32c60",
+      "paths": ["eng/json"]
+    },
+    "aquifer_translation_notes_sil": {
+      "repo": "https://github.com/BibleAquifer/SILOpenTranslatorsNotes",
+      "commit": "0ba58c2954c13f1ca8f3c9299d7a3ee62143ee93",
+      "paths": ["eng/json"]
+    },
+    "aquifer_key_terms": {
+      "repo": "https://github.com/BibleAquifer/FIAKeyTerms",
+      "commit": "91e4a7748498ca4fa85f8d75fc054ae587f044c0",
+      "paths": ["eng/json"]
+    },
+    "acai": {
+      "repo": "https://github.com/BibleAquifer/ACAI",
+      "commit": "7e6a2d6674910aedb0888493ebbe6684d374ae5c",
+      "paths": ["people/json", "places/json", "groups/json", "keyterms/json"]
+    },
+    "theographic": {
+      "repo": "https://github.com/robertrouse/theographic-bible-metadata",
+      "commit": "52e049efb3b95e4f1da52d11a3303fbd2d648922",
+      "paths": ["CSV/People.csv", "CSV/Places.csv", "CSV/Events.csv", "CSV/PeopleGroups.csv"]
+    }
+  },
+  "openbible_cross_references": {
+    "file": "vendor/openbible-cross-references-2026-10-12.txt.zst",
+    "sha256": "2aba58d2adc91609a090f80bb05dfbc7a1518ff10ee798f6b452dfeaf01ccff8"
+  },
+  "embedding_model": {
+    "repo": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "files": {
+      "onnx/model.onnx": "828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35",
+      "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+    }
+  }
+}

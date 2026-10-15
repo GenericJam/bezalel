@@ -1,0 +1,45 @@
+{
+  "packs": {
+    "core": {
+      "description": "Hebrew and Greek texts with morphology, the BSB, lexicons, Strong's, names and entities, cross references, Torah weave, similar verses and passages",
+      "tables": [
+        "verses", "bsb_verses", "passages", "lexicon", "morphology", "names", "acai_entities",
+        "cross_references", "thematic_references", "torah_weave_units", "torah_weave_cells",
+        "similar_verses", "similar_passages"
+      ]
+    },
+    "notes": {
+      "description": "Study notes, Bible dictionary, translator notes, key terms, ANE context, theology summaries",
+      "tables": [
+        "aquifer_content", "ane_entries", "ane_book_mappings",
+        "theology_content", "theology_verse_index", "theology_themes", "theology_theme_index"
+      ]
+    },
+    "lxx": {
+      "description": "Septuagint (Rahlfs with morphology, Brenton English and Greek) for MT/LXX comparison",
+      "tables": ["biblical_version_verses"]
+    },
+    "ancient": {
+      "description": "Ancient sources to c. AD 200: Josephus, Targum Onkelos, Qumran, Philo, 1 Enoch, 4 Ezra, Mishnah",
+      "tables": [
+        "ancient_source_passages", "ancient_source_passages_fts",
+        "ancient_source_biblical_links", "ancient_source_notes"
+      ]
+    },
+    "graph": {
+      "description": "Theographic people, places, events, family and verse-mention graph",
+      "tables": [
+        "graph_people", "graph_places", "graph_events", "graph_people_groups",
+        "graph_family_edges", "graph_person_event_edges", "graph_event_place_edges",
+        "graph_person_group_edges", "graph_verse_mentions"
+      ]
+    }
+  },
+  "drop_empty": [
+    "hlt_verses", "hlt_annotations", "hlt_study_notes", "nt_ot_lxx_quote_hints",
+    "textual_variant_cases", "textual_variant_readings", "textual_variant_witnesses",
+    "textual_critical_judgments", "textual_theological_interpretations",
+    "textual_author_claims", "textual_translation_decisions"
+  ],
+  "drop_views": ["heiser_content", "heiser_verse_index", "heiser_themes", "heiser_theme_index"]
+}
