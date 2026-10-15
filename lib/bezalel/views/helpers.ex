@@ -1,7 +1,8 @@
 defmodule Bezalel.Views.Helpers do
   @moduledoc "Socket helpers shared by the tab views."
 
-  alias Bezalel.{Library, Models, Settings}
+  alias Bezalel.{Agent, Library, Models, Settings}
+  alias Bezalel.Agent.Reply
   alias Bezalel.Views.Conversations
   alias Mob.Socket
 
@@ -65,11 +66,19 @@ defmodule Bezalel.Views.Helpers do
 
   @doc """
   Opens a conversation in Study. A toast from the previous one (its Undo and
-  Ask again act on that conversation) is dropped.
+  Ask again act on that conversation) is dropped. The agent's loops of the
+  other conversations go, unless their reply is still streaming (they go
+  when it ends).
   """
   def open_conversation(socket, conversation) do
     Settings.put_conversation_id(conversation.id)
     messages = Library.messages(conversation.id)
+    live_summary = live_id(conversation.id) <> ":sum"
+
+    expanded =
+      if Map.has_key?(socket.assigns.streams, conversation.id),
+        do: MapSet.put(summaries_open(messages), live_summary),
+        else: summaries_open(messages)
 
     socket
     |> Socket.assign(
@@ -80,12 +89,34 @@ defmodule Bezalel.Views.Helpers do
       switched: false,
       draft: ""
     )
-    |> Socket.assign(:expanded, summaries_open(messages))
+    |> Socket.assign(:expanded, expanded)
     |> Socket.assign(:tab, :study)
+    |> release_unused()
   end
 
-  @doc "Whether a reply to the open conversation is on its way."
-  def replying?(assigns), do: Map.get(assigns.replying, assigns.conversation.id, 0) > 0
+  defp release_unused(socket) do
+    %{sessions: sessions, streams: streams, conversation: %{id: open}} = socket.assigns
+
+    gone =
+      for cid <- sessions |> Map.values() |> Enum.uniq(),
+          cid != open and not Reply.running?(streams[cid]),
+          into: MapSet.new() do
+        :ok = Agent.release(cid)
+        cid
+      end
+
+    sessions = Map.reject(sessions, fn {_sid, cid} -> MapSet.member?(gone, cid) end)
+    Socket.assign(socket, :sessions, sessions)
+  end
+
+  @doc "Whether a reply to the open conversation is on its way (scripted or live)."
+  def replying?(assigns) do
+    id = assigns.conversation.id
+    Map.get(assigns.replying, id, 0) > 0 or Reply.running?(Map.get(assigns.streams, id))
+  end
+
+  @doc "The id a conversation's streaming reply's blocks are keyed under (`block_key/2`)."
+  def live_id(conversation_id), do: "live-#{conversation_id}"
 
   @doc "Summaries start open; thinking and tool calls folded (the design's default)."
   def summaries_open(messages) do

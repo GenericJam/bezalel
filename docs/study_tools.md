@@ -10,7 +10,7 @@ study packs ([data/README.md](../data/README.md)).
 | Module | What |
 |---|---|
 | `Bezalel.Study.Tools` | `tier1/0`, the tool modules |
-| `Bezalel.Study.Tools.*` | `LookupVerse`, `WordStudy`, `SearchLexicon`, `SearchByStrongs`, `GetCrossReferences`, `ParseMorphology`, `LookupName`, `PeopleInPassage`, `FindSimilarPassages`: each a `Rho.Tool` (`run/2` → the Markdown the model reads) with `result/1` (the same answer as data for the screens, e.g. `lookup_verse`'s words with their Strong's numbers) and `render/1` |
+| `Bezalel.Study.Tools.*` | `LookupVerse`, `WordStudy`, `SearchLexicon`, `SearchByStrongs`, `GetCrossReferences`, `ParseMorphology`, `LookupName`, `PeopleInPassage`, `FindSimilarPassages`: each a `Rho.Tool` (`run/2` → the Markdown the model reads) with `result/1` (the same answer as data for the screens, e.g. `lookup_verse`'s words with their Strong's numbers) and `render/1`. `LookupVerse` and `WordStudy`'s `run/2` also hand `result/1` to rho as the result's details (`{:ok, {:details, markdown, result}}`): the model gets the Markdown, the screen the data, which `Bezalel.Agent.Card` makes the passage card |
 | `Bezalel.Study.DB` | Opens the packs read-only |
 | `Bezalel.Study.Reference` | Book names and reference forms ("Ex 31:2-3", "Exodus 31", "Jn 3:16", "Jude 3") |
 | `Bezalel.Study.Verses`, `Bezalel.Study.Lexicon` | Verse and lexicon queries |

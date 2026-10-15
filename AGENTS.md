@@ -79,7 +79,7 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   and token usage: `Bezalel.Account`, over rho.
 - **Study tools** (`Bezalel.Study.*`): studybible-mcp's tools ported to
   Elixir as rho tool modules over the study packs (`data/`), with the
-  system prompt (`Bezalel.Study.Prompt`). Not wired to the agent yet. How
+  system prompt (`Bezalel.Study.Prompt`); the live agent runs them. How
   they were ported, the pack access, the fixtures and the differences from
   studybible-mcp: `docs/study_tools.md`.
 - **rho** (`../rho`, a path dep until it's on Hex) is the agent core:
@@ -101,13 +101,37 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   key replaces a sign-in to the same provider. On the host, tests use an
   in-memory store and a fake browser (`test/support/fakes.ex`, set in
   `config/test.exs`); they never reach the network.
-- The agent and the tool builder are seams: `Bezalel.Agent` and
-  `Bezalel.Workshop` behaviours, picked by `config :bezalel, :agent` /
-  `:builder`. Today both are the design's storyboard (scripted replies; the
-  builder makes only the sermon outline and says so for anything else).
-  Settings tells the user replies are scripted until the agent runs on rho
-  (bezalel-y77.1); sign-in, API keys, the model list and usage are real.
-  A real model plugs in behind those behaviours, not in the views.
+- **The agent** (`Bezalel.Agent`): live once the user has a sign-in or an
+  API key for any provider. `Bezalel.Agent.Live` runs one rho loop per
+  conversation being answered (study prompt, tier 1 tools, the model from
+  Settings), seeded from the Library (user messages and each reply's
+  SUMMARY) and released when the conversation is left, a message in it is
+  deleted or restored, a reply is stopped or fails, or the screen mounts.
+  Its events stream into `Bezalel.Agent.Reply` (THINKING / TOOL CALL /
+  SUMMARY, the passage card from `lookup_verse` / `word_study`'s data,
+  `Bezalel.Agent.Card`) in `Bezalel.Views.Study`: stop button while it
+  streams, a message sent meanwhile steers it, errors stay as a card with
+  Try again (and Open Settings for sign-in problems). Without a credential,
+  replies are the design's storyboard (`Bezalel.Agent.Storyboard`), and
+  Settings and Study say so. Tests drive Live with a scripted model
+  (`test/support/fake_llm.ex`, `test/bezalel/live_agent_test.exs`). The
+  Workshop builder (`Bezalel.Workshop`) is still the storyboard.
+- **Study packs on a device (dev step, until the download, bezalel-y77.6)**:
+  the tools read `Mob.data_dir()/packs`. Push the core pack (182 MB; the
+  others only if you need them; disk is tight, delete them when done):
+  - Android (debug build): `adb -s <serial> push data/out/core.sqlite /data/local/tmp/ && adb -s <serial> shell "run-as com.example.bezalel mkdir -p files/packs && run-as com.example.bezalel cp /data/local/tmp/core.sqlite files/packs/ && rm /data/local/tmp/core.sqlite"`
+  - iOS simulator: `d=$(xcrun simctl get_app_container <udid> com.example.bezalel data) && mkdir -p "$d/Documents/packs" && cp data/out/core.sqlite "$d/Documents/packs/"`
+    (check `Mob.data_dir()` on the node if the app's data dir differs)
+  - Remove: `run-as com.example.bezalel rm -r files/packs` / `rm -r "$d/Documents/packs"`.
+  A native redeploy that reinstalls the app clears its data, packs included.
+  Without a pack the tools return an error naming it; the model sees it and
+  the reply still lands.
+- **Trying a full live turn without a real account**: point req_llm at a
+  local stand-in for the provider on the node,
+  `Application.put_env(:req_llm, :anthropic, base_url: "http://10.0.2.2:PORT")`
+  (Android emulator; `http://127.0.0.1:PORT` on the iOS simulator), with
+  any Anthropic API key saved in Settings. `Application.delete_env(:req_llm,
+  :anthropic)` (or a restart) goes back to the real API.
 - To try an unreleased mob fix here first, point the dep at the checkout
   (`{:mob, path: "../mob", override: true}`) and set `mob_dir` to it in the
   gitignored `mob.local.exs` (native builds read mob's sources from there);

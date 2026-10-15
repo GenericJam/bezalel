@@ -9,9 +9,12 @@ defmodule Bezalel.Study.Tools.LexiconToolsTest do
   alias Bezalel.Study.{DB, Verses}
   alias Bezalel.Study.Tools.{ParseMorphology, SearchByStrongs, SearchLexicon, WordStudy}
 
+  # word_study answers with its data too (rho's tool details); the others with text.
   defp ok(tool, args) do
-    assert {:ok, text} = tool.run(args, %{})
-    text
+    case tool.run(args, %{}) do
+      {:ok, {:details, text, _result}} -> text
+      {:ok, text} when is_binary(text) -> text
+    end
   end
 
   defp error(tool, args) do

@@ -25,9 +25,9 @@ defmodule Bezalel.Views.Settings do
         else: nil
 
     model_note =
-      if Agent.live?(),
+      if Agent.live?(assigns.account),
         do: nil,
-        else: "Replies come from the design’s script until a model is connected."
+        else: "Replies come from the design’s script until you sign in or add an API key."
 
     appearance =
       UI.card(

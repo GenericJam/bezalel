@@ -64,7 +64,7 @@ defmodule Bezalel.Library do
   @doc """
   Appends a message to a conversation and marks the conversation active.
   `attrs` takes `:role` plus `:text` (user) or `:blocks`, `:passage`,
-  `:image`, `:model` (agent). The position comes from the conversation's
+  `:card`, `:image`, `:model` (agent). The position comes from the conversation's
   counter, so a deleted message's slot is never handed out again.
   """
   @spec add_message(Conversation.t(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
@@ -107,6 +107,7 @@ defmodule Bezalel.Library do
         :text,
         :blocks,
         :passage,
+        :card,
         :image,
         :model
       ])

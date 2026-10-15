@@ -2,8 +2,10 @@ defmodule Bezalel.Library.Message do
   @moduledoc """
   A message in a conversation. A user message has `text`. An agent message has
   `blocks` (each `%{"id", "type", "first", "rest"}`: THINKING, TOOL CALL,
-  SUMMARY), and optionally a cited `passage` (a `Bezalel.Scripture` key) or a
-  requested `image`, plus the `model` that answered.
+  SUMMARY), and optionally a cited passage, as a `Bezalel.Scripture` key
+  (`passage`, scripted replies) or a card built from the study tools'
+  results (`card`, `Bezalel.Agent.Card`, live replies), or a requested
+  `image`, plus the `model` that answered.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -15,12 +17,13 @@ defmodule Bezalel.Library.Message do
     field :text, :string
     field :blocks, {:array, :map}, default: []
     field :passage, :string
+    field :card, :map
     field :image, :string
     field :model, :string
     timestamps(type: :utc_datetime_usec, updated_at: false)
   end
 
-  @fields [:conversation_id, :position, :role, :text, :blocks, :passage, :image, :model]
+  @fields [:conversation_id, :position, :role, :text, :blocks, :passage, :card, :image, :model]
 
   @doc false
   def changeset(message, attrs) do

@@ -5,7 +5,10 @@ defmodule Bezalel.Study.Tools do
   Copyright (c) 2024 Study Bible MCP Contributors; see NOTICE) at commit
   38cef28. They read the study packs through `Bezalel.Study.DB`. Each
   module's `run/2` returns the Markdown the model reads and `result/1` the
-  same answer as data for the app's screens.
+  same answer as data for the app's screens. `lookup_verse` and
+  `word_study`'s `run/2` hand that data to rho as the result's details
+  (`{:ok, {:details, markdown, result}}`), which the live agent turns into
+  the passage card (`Bezalel.Agent.Card`).
 
   `tier1/0` is the first set: text, lexicon, morphology, names, cross
   references and similar passages (the core pack) and the people in a

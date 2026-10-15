@@ -34,6 +34,9 @@ defmodule Bezalel.AppScreen do
     :ok = Rho.Auth.subscribe()
     :ok = Rho.Usage.subscribe()
     login = Login.pending()
+    # Loops left by an earlier run of this screen answer to nobody now; the
+    # next question starts one from the conversation as stored.
+    :ok = Bezalel.Agent.release_all()
 
     conversation = Library.get_conversation(Settings.conversation_id()) || Library.seed!()
 
@@ -59,6 +62,9 @@ defmodule Bezalel.AppScreen do
         shelf_done: true,
         counts: %{conversations: 0, tools: 0},
         replying: %{},
+        streams: %{},
+        sessions: %{},
+        stale: MapSet.new(),
         switched: false,
         move_open: 0
       )
@@ -228,10 +234,16 @@ defmodule Bezalel.AppScreen do
     {:noreply, socket}
   end
 
+  def handle_info({:rho, session_id, event}, socket),
+    do: {:noreply, Study.agent_event(session_id, event, socket)}
+
   def handle_info(_message, socket), do: {:noreply, socket}
 
   def handle_async({:reply, conversation_id, _ref}, result, socket),
     do: {:noreply, Study.replied(conversation_id, result, socket)}
+
+  def handle_async({:lexicon, strongs}, result, socket),
+    do: {:noreply, Study.lexicon(strongs, result, socket)}
 
   def handle_async(:build, result, socket), do: {:noreply, Workshop.built(result, socket)}
 end

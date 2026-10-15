@@ -60,9 +60,10 @@ defmodule Bezalel.Study.Tools.WordStudy do
     }
   end
 
+  @doc "The Markdown for the model, with `result/1`'s data for the screens (rho's tool details)."
   @impl true
   def run(args, _ctx) do
-    with {:ok, result} <- result(args), do: {:ok, render(result)}
+    with {:ok, result} <- result(args), do: {:ok, {:details, render(result), result}}
   end
 
   @typedoc "The entry (a lexicon row; nil when a word matched none) and its example verses."

@@ -1,5 +1,8 @@
 defmodule Bezalel.Views.Sheets do
-  @moduledoc "The bottom sheets: choose a model, confirm a delete, a Hebrew word."
+  @moduledoc """
+  The bottom sheets: choose a model, confirm a delete, a Hebrew word (the
+  storyboard's, or a word from a live reply's passage card).
+  """
   import Mob.Sigil
 
   alias Bezalel.{Models, Scripture}
@@ -131,9 +134,62 @@ defmodule Bezalel.Views.Sheets do
       ~MOB(<Wrap spacing={8} run_spacing={8} fill_width={true}>
   {refs}
 </Wrap>),
-      UI.pill_button(ask_label(model, w), ask)
+      UI.pill_button(ask_label(model, w.translit, assigns.account), ask)
     ]
   end
+
+  # A word of a live reply's passage card (`Bezalel.Agent.Card`): what the
+  # verse's word data says, and the lexicon entry once it's read (`lex`:
+  # nil while loading, `:none` when the pack has none).
+  defp content({:lexeme, w, lex}, assigns) do
+    model = Models.get(assigns.model_id)
+    ask = {self(), {:study, {:ask_lexeme, w}}}
+    font = if hebrew?(w), do: :hebrew_medium, else: :scripture
+    meta = lexeme_meta(w, lex)
+    definition = lexeme_definition(w, lex)
+
+    [
+      ~MOB"""
+      <Row gap={12} align={:center} fill_width={true}>
+        <Text text={w["word"]} font={font} text_size={40} text_color={:on_background} />
+        <Column gap={2} weight={1}>
+          <Text
+            text={w["translit"]}
+            font={:scripture_italic}
+            text_size={19}
+            text_color={:on_background}
+          />
+          <Text text={meta} text_size={12} text_color={:muted} />
+        </Column>
+      </Row>
+      """,
+      UI.kicker("In this verse"),
+      ~MOB(<Text
+  text={w["gloss"]}
+  font={:scripture}
+  text_size={19}
+  line_height={1.45}
+  text_color={:on_background}
+/>),
+      UI.kicker("Lexicon"),
+      ~MOB(<Text text={definition} text_size={14.5} line_height={1.55} text_color={:on_background} />),
+      UI.pill_button(ask_label(model, w["translit"], assigns.account), ask)
+    ]
+  end
+
+  defp hebrew?(w), do: String.starts_with?(w["strongs"], "H")
+
+  # "H7307G · HNcfsc · 378× in the OT"
+  defp lexeme_meta(w, lex) do
+    count = if is_map(lex), do: lex["usage_count"]
+    testament = if hebrew?(w), do: "OT", else: "NT"
+    times = if is_integer(count) and count > 0, do: ["#{count}× in the #{testament}"], else: []
+    Enum.join([w["strongs"], w["morph"]] ++ times, " · ")
+  end
+
+  defp lexeme_definition(_w, nil), do: "Reading the lexicon…"
+  defp lexeme_definition(w, :none), do: "No lexicon entry on this phone for #{w["strongs"]}."
+  defp lexeme_definition(_w, lex), do: lex["short_definition"] || ""
 
   defp model_row(model, current) do
     border = if model.id == current, do: :secondary, else: :border
@@ -188,10 +244,10 @@ defmodule Bezalel.Views.Sheets do
     """
   end
 
-  defp ask_label(model, w) do
-    if Bezalel.Agent.live?(),
-      do: "Ask #{model.name} about #{w.translit}",
-      else: "Ask about #{w.translit}"
+  defp ask_label(model, translit, account) do
+    if Bezalel.Agent.live?(account),
+      do: "Ask #{model.name} about #{translit}",
+      else: "Ask about #{translit}"
   end
 
   defp no_models do

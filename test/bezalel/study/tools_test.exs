@@ -40,7 +40,9 @@ defmodule Bezalel.Study.ToolsTest do
   end
 
   test "every hint lookup_verse gives names a tool Bezalel has" do
-    {:ok, text} = Tools.LookupVerse.run(%{"reference" => "Exodus 31:2-3"}, %{})
+    {:ok, {:details, text, _result}} =
+      Tools.LookupVerse.run(%{"reference" => "Exodus 31:2-3"}, %{})
+
     assert tools_named(text) -- @names == []
   end
 

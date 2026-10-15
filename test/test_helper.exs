@@ -29,5 +29,6 @@ redirect = fn provider ->
 end
 
 {:ok, _} = Rho.Supervisor.start_link(tools: [], login: [redirect: redirect])
+{:ok, _} = Bezalel.Agent.Live.start_link()
 
 ExUnit.start()

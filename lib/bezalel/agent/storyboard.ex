@@ -1,20 +1,21 @@
 defmodule Bezalel.Agent.Storyboard do
   @moduledoc """
-  The scripted replies of the Core Screens v2 design, used until a model is
-  connected. A question that mentions a word from `Bezalel.Scripture`'s
+  The scripted replies of the Core Screens v2 design, used while the user
+  has no model (no sign-in, no API key: `Bezalel.Agent.live?/1`) and in
+  tests. A question that mentions a word from `Bezalel.Scripture`'s
   lexicon (in English, transliterated, or Hebrew) gets that word's entry
   (Hebrew, Strong's number, cross-references); anything else gets a short
   reply placing it in Exodus 31:1–11. Replies are attributed to
   `"storyboard"`, not to the chosen model, which the script ignores.
   """
-  @behaviour Bezalel.Agent
 
   alias Bezalel.Scripture
 
-  @impl true
-  def live?, do: false
+  @typedoc "A scripted reply: its blocks, an optional cited passage, and `by`: `\"storyboard\"`."
+  @type reply :: %{blocks: [map()], passage: String.t() | nil, by: String.t()}
 
-  @impl true
+  @doc "The scripted reply to the last question in `messages`."
+  @spec reply([Bezalel.Library.Message.t()], map()) :: {:ok, reply()}
   def reply(messages, _model) do
     question =
       messages

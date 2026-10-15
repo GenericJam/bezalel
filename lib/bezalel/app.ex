@@ -3,6 +3,8 @@ defmodule Bezalel.App do
 
   use Mob.App
 
+  alias Bezalel.Agent.Live
+
   @impl Mob.App
   def navigation(_platform) do
     stack(:main, root: Bezalel.AppScreen)
@@ -23,18 +25,21 @@ defmodule Bezalel.App do
     Mob.DNS.configure_pure_beam()
 
     # The emulator (and some networks) drop outbound UDP :53, so pure DNS
-    # can't find the sign-in token endpoints: seed them through the platform
-    # resolver.
-    for host <- ~w(api.anthropic.com auth.openai.com chatgpt.com),
+    # can't find the sign-in token and model endpoints: seed them through
+    # the platform resolver.
+    for host <-
+          ~w(api.anthropic.com auth.openai.com chatgpt.com api.openai.com generativelanguage.googleapis.com),
         do: Mob.DNS.resolve(host)
 
     :ok = Bezalel.Certs.install!()
 
-    # rho (models, sign-in, usage). Mob doesn't start a dep's Applications
-    # on device, so the HTTP stack is started first. No agent tools yet:
-    # replies are still scripted (Bezalel.Agent).
+    # rho (models, sign-in, usage, the agent loop). Mob doesn't start a
+    # dep's Applications on device, so the HTTP stack is started first. The
+    # loops carry their own tools (Bezalel.Agent.Live), so the registry's
+    # list stays empty; Live names its loops in its own Registry.
     {:ok, _} = Application.ensure_all_started(:req_llm)
     {:ok, _} = Rho.Supervisor.start_link(tools: [])
+    {:ok, _} = Live.start_link()
 
     {:ok, _} = Application.ensure_all_started(:ecto_sqlite3)
     {:ok, _} = Bezalel.Repo.start_link()

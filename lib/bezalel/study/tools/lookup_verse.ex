@@ -79,9 +79,10 @@ defmodule Bezalel.Study.Tools.LookupVerse do
     }
   end
 
+  @doc "The Markdown for the model, with `result/1`'s data for the screens (rho's tool details)."
   @impl true
   def run(args, _ctx) do
-    with {:ok, result} <- result(args), do: {:ok, render(result)}
+    with {:ok, result} <- result(args), do: {:ok, {:details, render(result), result}}
   end
 
   @typedoc """

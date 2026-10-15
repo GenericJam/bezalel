@@ -7,7 +7,7 @@ defmodule Bezalel.Study.Tools.LookupVerseTest do
   alias Bezalel.Study.Tools.LookupVerse
 
   defp lookup(reference, args \\ %{}) do
-    {:ok, text} = LookupVerse.run(Map.put(args, "reference", reference), %{})
+    {:ok, {:details, text, _result}} = LookupVerse.run(Map.put(args, "reference", reference), %{})
     text
   end
 

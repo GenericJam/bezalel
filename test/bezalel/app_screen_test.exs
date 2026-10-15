@@ -5,6 +5,7 @@ defmodule Bezalel.AppScreenTest do
 
   alias Bezalel.{AppScreen, Library, Repo}
   alias Bezalel.Library.{Conversation, Message, Tool}
+  alias Bezalel.Test.MemoryStore
   alias Bezalel.Views.Helpers
 
   setup do
@@ -12,6 +13,9 @@ defmodule Bezalel.AppScreenTest do
     Mob.State.delete(:bezalel_conversation)
     Mob.State.delete(:bezalel_mode)
     Mob.State.delete(:bezalel_model)
+    # No sign-in or API key: replies are the storyboard's (live replies are
+    # Bezalel.LiveAgentTest's).
+    MemoryStore.clear()
     :ok
   end
 

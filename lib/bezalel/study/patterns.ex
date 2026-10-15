@@ -1,12 +1,14 @@
 defmodule Bezalel.Study.Patterns do
   @moduledoc """
-  The regular expressions the study tools use, compiled on first use and
-  kept in `:persistent_term`. They are not `~r` literals: a regex compiled
-  into a module is tied to the OTP it was compiled under, and mob_dev builds
-  the app on one OTP for phones running another.
+  The regular expressions the study tools (and the live agent's replies and
+  passage cards) use, compiled on first use and kept in `:persistent_term`.
+  They are not `~r` literals: a regex compiled into a module is tied to the
+  OTP it was compiled under, and mob_dev builds the app on one OTP for
+  phones running another.
 
-  The sources are studybible-mcp's (`database.py`, `hermeneutics.py`,
-  `tools.py`), with Python's `(?P<name>…)` written `(?<name>…)`.
+  The study tools' sources are studybible-mcp's (`database.py`,
+  `hermeneutics.py`, `tools.py`), with Python's `(?P<name>…)` written
+  `(?<name>…)`.
   """
 
   # The reference patterns spell digits [0-9]: with "u" (needed for the
@@ -39,7 +41,11 @@ defmodule Bezalel.Study.Patterns do
     superscription: {~S"^([^.]+)\.(\d+)\.0(?:\((\d+\.\d+)\))?$", ""},
     # get_genre_from_reference: 'Jhn.3.16', then 'John 3:16'.
     genre_code: {~S"^(\w{3})\.\d+\.\d+", "u"},
-    genre_name: {~S"^(\d?\s*[a-zA-Z]+)\s*\d+:\d+", "u"}
+    genre_name: {~S"^(\d?\s*[a-zA-Z]+)\s*\d+:\d+", "u"},
+    # Bezalel.Agent.Card: punctuation and quotes around an English word.
+    word_edges: {~S"^[\p{P}\p{S}]+|[\p{P}\p{S}]+$", "u"},
+    # Bezalel.Agent.Reply: a block's header, its first sentence or line.
+    first_sentence: {~S"\A.+?(?:[.?!:](?=\s)|\n|\z)", "su"}
   }
 
   # The cache key carries a hash of the sources, so a hot-loaded version of
