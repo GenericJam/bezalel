@@ -4,12 +4,12 @@ defmodule Bezalel.AppScreenTest do
   @moduletag :screen
 
   alias Bezalel.{AppScreen, Library, Repo}
-  alias Bezalel.Library.{Conversation, Message, Tool}
+  alias Bezalel.Library.{Conversation, Tool, Undo}
   alias Bezalel.Test.MemoryStore
   alias Bezalel.Views.Helpers
 
   setup do
-    for schema <- [Message, Tool, Conversation], do: Repo.delete_all(schema)
+    for schema <- [Tool, Conversation], do: Repo.delete_all(schema)
     Mob.State.delete(:bezalel_conversation)
     Mob.State.delete(:bezalel_mode)
     Mob.State.delete(:bezalel_model)
@@ -152,7 +152,7 @@ defmodule Bezalel.AppScreenTest do
     last = List.last(assigns(view).messages)
 
     view = render_info(view, {:tap, {:study, {:delete, last.id}}})
-    assert %{undo: %Message{id: id}, ask_again: true} = assigns(view).toast
+    assert %{undo: %Undo{messages: [%{id: id}]}, ask_again: true} = assigns(view).toast
     assert id == last.id
     refute Enum.any?(assigns(view).messages, &(&1.id == last.id))
 

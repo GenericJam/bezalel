@@ -1,13 +1,39 @@
 defmodule Bezalel.Library do
   @moduledoc """
-  What the app keeps on the phone: conversations, their messages, and the
-  tools built in the Workshop.
+  What the app keeps on the phone: the shelf of conversations, each one's
+  transcript, and the tools built in the Workshop.
+
+  A conversation's transcript is its rho session (`Rho.Session`, a JSONL
+  file in `Rho.Session.dir/0`); the conversations table is the shelf
+  (name, kind, kicker, the session's id and file, the message count).
+  The live agent's loop writes the session while it answers
+  (`Bezalel.Agent.Live` resumes it); everything else (scripted replies,
+  Delete and Undo as branch moves, a question taken back to ask again) is
+  written here, only while the conversation has no loop: the caller
+  releases it first, since a loop keeps its own place in the file. How
+  the messages are read off the session and what the moves are:
+  `Bezalel.Library.Transcript`.
   """
   import Ecto.Query
 
   alias Bezalel.Agent.Storyboard
-  alias Bezalel.Library.{Conversation, Message, Tool}
-  alias Bezalel.Repo
+  alias Bezalel.Library.{Conversation, Message, Tool, Transcript}
+  alias Bezalel.{Models, Repo}
+  alias Rho.Session
+
+  defmodule Undo do
+    @moduledoc """
+    What a delete needs to be undone: the conversation, the leaf before
+    the delete (`before`) and after it (`after`), and the deleted messages.
+    """
+    @type t :: %__MODULE__{
+            conversation_id: integer(),
+            before: String.t() | nil,
+            after: String.t() | nil,
+            messages: [Bezalel.Library.Message.t()]
+          }
+    defstruct [:conversation_id, :before, :after, messages: []]
+  end
 
   # ── Conversations ─────────────────────────────────────────────────────────
 
@@ -20,10 +46,8 @@ defmodule Bezalel.Library do
         ]
   def list_conversations(opts \\ []) do
     from(c in Conversation,
-      left_join: m in assoc(c, :messages),
-      group_by: c.id,
       order_by: [desc: c.updated_at, desc: c.id],
-      select: %{conversation: c, message_count: count(m.id)}
+      select: %{conversation: c, message_count: c.message_count}
     )
     |> limit(^Keyword.get(opts, :limit, -1))
     |> offset(^Keyword.get(opts, :offset, 0))
@@ -41,7 +65,7 @@ defmodule Bezalel.Library do
     Repo.one(from(c in Conversation, order_by: [desc: c.updated_at, desc: c.id], limit: 1))
   end
 
-  @doc "Starts a conversation."
+  @doc "Starts a conversation (its session is created when it's first written)."
   @spec create_conversation(map()) :: {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()}
   def create_conversation(attrs) do
     %Conversation{} |> Conversation.changeset(attrs) |> Repo.insert()
@@ -51,70 +75,217 @@ defmodule Bezalel.Library do
   @spec conversation_count() :: non_neg_integer()
   def conversation_count, do: Repo.aggregate(Conversation, :count)
 
-  # ── Messages ──────────────────────────────────────────────────────────────
-
-  @doc "A conversation's messages in order."
-  @spec messages(integer()) :: [Message.t()]
-  def messages(conversation_id) do
-    Repo.all(
-      from(m in Message, where: m.conversation_id == ^conversation_id, order_by: m.position)
-    )
-  end
+  # ── Sessions ──────────────────────────────────────────────────────────────
 
   @doc """
-  Appends a message to a conversation and marks the conversation active.
-  `attrs` takes `:role` plus `:text` (user) or `:blocks`, `:passage`,
-  `:card`, `:image`, `:model` (agent). The position comes from the conversation's
-  counter, so a deleted message's slot is never handed out again.
+  The conversation's session for a loop to resume, with the entries on
+  its active branch; a new one (recorded on the shelf, written by its
+  first entry) for a conversation that has none. `model` is the req_llm
+  spec a new session starts on.
   """
-  @spec add_message(Conversation.t(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
-  def add_message(%Conversation{id: id}, attrs) do
-    Repo.transact(fn ->
-      # Claim the slot and mark the conversation active in one write.
-      {1, [position]} =
-        Repo.update_all(
-          from(c in Conversation, where: c.id == ^id, select: c.next_position - 1),
-          inc: [next_position: 1],
-          set: [updated_at: DateTime.utc_now()]
-        )
+  @spec session(integer(), String.t()) ::
+          {:ok, Session.t(), [Session.entry()]} | {:error, :not_found}
+  def session(conversation_id, model) do
+    case get_conversation(conversation_id) do
+      nil ->
+        {:error, :not_found}
 
-      %Message{}
-      |> Message.changeset(Map.merge(attrs, %{conversation_id: id, position: position}))
-      |> Repo.insert()
-    end)
-  end
-
-  @doc """
-  Deletes a message and returns it, so `restore_message/1` can put it back
-  (the Undo on the toast).
-  """
-  @spec delete_message(integer()) :: {:ok, Message.t()} | {:error, :not_found}
-  def delete_message(id) do
-    case Repo.get(Message, id) do
-      nil -> {:error, :not_found}
-      message -> Repo.delete(message)
+      conversation ->
+        {session, branch} = open(conversation, model)
+        {:ok, session, branch}
     end
   end
 
-  @doc "Puts a deleted message back in its place, with its id."
-  @spec restore_message(Message.t()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()}
-  def restore_message(%Message{} = message) do
-    attrs =
-      Map.take(message, [
-        :conversation_id,
-        :position,
-        :role,
-        :text,
-        :blocks,
-        :passage,
-        :card,
-        :image,
-        :model
-      ])
+  @doc "Where a conversation's session is, or nil before it has one."
+  @spec session_path(Conversation.t() | integer()) :: String.t() | nil
+  def session_path(%Conversation{session_file: nil}), do: nil
+  def session_path(%Conversation{session_file: file}), do: Path.join(Session.dir(), file)
+  def session_path(id), do: id |> get_conversation() |> then(&(&1 && session_path(&1)))
 
-    %Message{id: message.id, inserted_at: message.inserted_at}
-    |> Message.changeset(attrs)
-    |> Repo.insert()
+  @doc "The session file of the conversation whose session is `session_id`, or nil."
+  @spec session_path_by_id(String.t()) :: String.t() | nil
+  def session_path_by_id(session_id) do
+    Repo.one(from(c in Conversation, where: c.session_id == ^session_id, limit: 1))
+    |> then(&(&1 && session_path(&1)))
+  end
+
+  # ── Messages ──────────────────────────────────────────────────────────────
+
+  @doc "A conversation's messages in order, read off its session's active branch."
+  @spec messages(integer()) :: [Message.t()]
+  def messages(conversation_id) do
+    case get_conversation(conversation_id) do
+      %Conversation{session_file: file} = c when is_binary(file) ->
+        {session, branch} = open(c, Models.default())
+        Transcript.messages(branch, session.id)
+
+      _ ->
+        []
+    end
+  end
+
+  @doc """
+  Records that the conversation's loop wrote to its session: the shelf's
+  message count follows, and the conversation moves to the top.
+  """
+  @spec touch(integer()) :: :ok
+  def touch(conversation_id) do
+    count = length(messages(conversation_id))
+
+    Repo.update_all(from(c in Conversation, where: c.id == ^conversation_id),
+      set: [message_count: count, updated_at: DateTime.utc_now()]
+    )
+
+    :ok
+  end
+
+  @doc """
+  Appends a message and marks the conversation active. `attrs` takes
+  `:role` plus `:text` (user), or `:blocks`, `:passage`, `:card`,
+  `:image`, `:model` (a reply Bezalel writes: the storyboard's). Returns
+  the message as the chat reads it. The conversation must have no loop.
+  """
+  @spec add_message(Conversation.t(), map()) :: {:ok, Message.t()} | {:error, :empty}
+  def add_message(%Conversation{}, %{role: :user, text: text}) when text in [nil, ""],
+    do: {:error, :empty}
+
+  def add_message(%Conversation{} = conversation, %{role: :user, text: text}),
+    do: append(conversation, [Transcript.user(text)])
+
+  def add_message(%Conversation{} = conversation, %{role: :agent} = attrs),
+    do: append(conversation, [Transcript.reply(attrs)])
+
+  # The row is read again: the caller's copy may predate its session.
+  defp append(%Conversation{id: id}, entries) do
+    {session, _branch} = open(get_conversation(id), Models.default())
+    _session = Enum.reduce(entries, session, &elem(Session.append(&2, &1), 0))
+    touch(id)
+    {:ok, id |> messages() |> List.last()}
+  end
+
+  @doc """
+  Deletes messages (by `Bezalel.Library.Message` id): the conversation's
+  session branches without their entries. Returns what Undo needs. The
+  conversation must have no loop.
+  """
+  @spec delete_messages(integer(), [String.t()]) :: {:ok, Undo.t()} | {:error, :not_found}
+  def delete_messages(conversation_id, ids) do
+    with %Conversation{session_file: file} = c when is_binary(file) <-
+           get_conversation(conversation_id),
+         {session, branch} = open(c, Models.default()),
+         shown = Transcript.messages(branch, session.id),
+         [_ | _] = gone <- Enum.filter(shown, &(&1.id in ids)),
+         {parent, copies} <- Transcript.delete(branch, Enum.flat_map(gone, & &1.entries)) do
+      leaf = move(session, parent, copies)
+      recount(conversation_id)
+
+      {:ok,
+       %Undo{
+         conversation_id: conversation_id,
+         before: session.leaf_id,
+         after: leaf,
+         messages: gone
+       }}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Undoes a delete: the branch from before it, with anything added since
+  copied after. `{:error, :gone}` when the session moved on another way.
+  The conversation must have no loop.
+  """
+  @spec restore(Undo.t()) :: :ok | {:error, :gone}
+  def restore(%Undo{conversation_id: id, before: before, after: after_leaf}) do
+    with %Conversation{session_file: file} = c when is_binary(file) <- get_conversation(id),
+         {session, branch} = open(c, Models.default()),
+         {parent, copies} <- Transcript.undo(branch, before, after_leaf) do
+      move(session, parent, copies)
+      recount(id)
+      :ok
+    else
+      _ -> {:error, :gone}
+    end
+  end
+
+  @doc """
+  Takes the last question back off the session, to ask it again (Try
+  again, Ask again): `{:ok, text}`, or `:none` when the conversation
+  doesn't end in one. The conversation must have no loop.
+  """
+  @spec take_question(integer()) :: {:ok, String.t()} | :none
+  def take_question(conversation_id) do
+    with %Conversation{session_file: file} = c when is_binary(file) <-
+           get_conversation(conversation_id),
+         {session, branch} = open(c, Models.default()),
+         {{parent, copies}, text} <- Transcript.take_question(branch) do
+      move(session, parent, copies)
+      {:ok, text}
+    else
+      _ -> :none
+    end
+  end
+
+  @doc """
+  Drops a failed reply's entries (after the last question) from the
+  session: the chat shows the failure until it's asked again. The
+  conversation must have no loop.
+  """
+  @spec drop_failed(integer()) :: :ok
+  def drop_failed(conversation_id) do
+    with %Conversation{session_file: file} = c when is_binary(file) <-
+           get_conversation(conversation_id),
+         {session, branch} = open(c, Models.default()),
+         {parent, copies} <- Transcript.drop_after_question(branch) do
+      move(session, parent, copies)
+      :ok
+    else
+      _ -> :ok
+    end
+  end
+
+  # The conversation's session and its active branch.
+  defp open(%Conversation{session_file: nil} = c, model) do
+    session = Session.new(Session.dir(), model, Rho.Config.data_dir())
+
+    Repo.update_all(from(x in Conversation, where: x.id == ^c.id),
+      set: [session_id: session.id, session_file: Path.basename(session.path)]
+    )
+
+    {session, []}
+  end
+
+  defp open(%Conversation{} = c, model) do
+    path = session_path(c)
+
+    case Session.open(path, model) do
+      {:ok, session, branch} ->
+        {session, branch}
+
+      # Recorded but never written (a loop that started and wrote nothing).
+      {:error, _} ->
+        {%Session{id: c.session_id, path: path, cwd: Rho.Config.data_dir(), model: model}, []}
+    end
+  end
+
+  # Puts the leaf under `parent` and appends `copies`; a marker when there
+  # is nothing to copy. Returns the new leaf.
+  defp move(session, parent, copies) do
+    entries = if copies == [], do: [Transcript.marker()], else: copies
+
+    session =
+      Enum.reduce(entries, %{session | leaf_id: parent}, &elem(Session.append(&2, &1), 0))
+
+    session.leaf_id
+  end
+
+  defp recount(conversation_id) do
+    count = length(messages(conversation_id))
+
+    Repo.update_all(from(c in Conversation, where: c.id == ^conversation_id),
+      set: [message_count: count]
+    )
   end
 
   # ── Tools ─────────────────────────────────────────────────────────────────
@@ -149,37 +320,25 @@ defmodule Bezalel.Library do
   end
 
   defp seed_exodus_31! do
-    {:ok, conversation} =
-      Repo.transact(fn ->
-        {:ok, c} =
-          create_conversation(%{
-            name: "Exodus 31 · Bezalel",
-            kicker: "SERMON PREP · EXODUS 31",
-            kind: "Sermon prep"
-          })
+    {:ok, c} =
+      create_conversation(%{
+        name: "Exodus 31 · Bezalel",
+        kicker: "SERMON PREP · EXODUS 31",
+        kind: "Sermon prep"
+      })
 
-        {:ok, _} =
-          add_message(c, %{
-            role: :user,
-            text: "Help me prepare a sermon on Bezalel — what’s the heart of it?"
-          })
+    {:ok, _} =
+      append(c, [
+        Transcript.user("Help me prepare a sermon on Bezalel — what’s the heart of it?"),
+        Transcript.reply(%{
+          model: "storyboard",
+          passage: "exodus-31-2-3",
+          blocks: Storyboard.opening_blocks()
+        }),
+        Transcript.user("Show me the lampstand he made."),
+        Transcript.reply(%{model: "storyboard", image: "lampstand"})
+      ])
 
-        {:ok, _} =
-          add_message(c, %{
-            role: :agent,
-            model: "storyboard",
-            passage: "exodus-31-2-3",
-            blocks: Storyboard.opening_blocks()
-          })
-
-        {:ok, _} = add_message(c, %{role: :user, text: "Show me the lampstand he made."})
-
-        {:ok, _} =
-          add_message(c, %{role: :agent, model: "storyboard", image: "lampstand"})
-
-        {:ok, c}
-      end)
-
-    conversation
+    get_conversation(c.id)
   end
 end

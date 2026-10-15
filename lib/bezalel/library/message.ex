@@ -1,43 +1,48 @@
 defmodule Bezalel.Library.Message do
   @moduledoc """
-  A message in a conversation. A user message has `text`. An agent message has
-  `blocks` (each `%{"id", "type", "first", "rest"}`, `"cut" => true` when
-  `first` is cut short and `rest` holds the whole text: THINKING, TOOL CALL,
-  SUMMARY), and optionally a cited passage, as a `Bezalel.Scripture` key
+  A message as the chat shows it, read from the conversation's session
+  (`Bezalel.Library.Transcript`): a user message, or an agent reply (every
+  session entry between two user messages).
+
+  `id` is the session id of its first entry and `entries` all of them (a
+  delete takes them all). A user message has `text`. A reply has `blocks`
+  (each `%{"id", "type", "first", "rest"}`, `"cut" => true` when `first`
+  is cut short and `rest` holds the whole text: THINKING, TOOL CALL,
+  SUMMARY), optionally a cited passage, as a `Bezalel.Scripture` key
   (`passage`, scripted replies) or a card built from the study tools'
-  results (`card`, `Bezalel.Agent.Card`, live replies), or a requested
-  `image`, plus the `model` that answered.
+  results (`card`, `Bezalel.Agent.Card`, live replies), a requested
+  drawing's subject (`image`, scripted), the `model` that answered (a
+  `Bezalel.Models` id, or `"storyboard"`). `images` are the pictures in
+  its entries (a tool's, a model's, a user's attachment), each
+  `%{key, entry, index, mime}`: the `index`th image part of entry `entry`,
+  `key` unique across sessions.
   """
-  use Ecto.Schema
-  import Ecto.Changeset
 
-  schema "messages" do
-    belongs_to :conversation, Bezalel.Library.Conversation
-    field :position, :integer
-    field :role, Ecto.Enum, values: [:user, :agent]
-    field :text, :string
-    field :blocks, {:array, :map}, default: []
-    field :passage, :string
-    field :card, :map
-    field :image, :string
-    field :model, :string
-    timestamps(type: :utc_datetime_usec, updated_at: false)
-  end
+  @type image :: %{key: String.t(), entry: String.t(), index: non_neg_integer(), mime: String.t()}
 
-  @fields [:conversation_id, :position, :role, :text, :blocks, :passage, :card, :image, :model]
+  @type t :: %__MODULE__{
+          id: String.t(),
+          role: :user | :agent,
+          text: String.t() | nil,
+          blocks: [map()],
+          passage: String.t() | nil,
+          card: map() | nil,
+          image: String.t() | nil,
+          images: [image()],
+          model: String.t() | nil,
+          entries: [String.t()]
+        }
 
-  @doc false
-  def changeset(message, attrs) do
-    message
-    |> cast(attrs, @fields)
-    |> validate_required([:conversation_id, :position, :role])
-    |> validate_role_content()
-  end
-
-  defp validate_role_content(changeset) do
-    case get_field(changeset, :role) do
-      :user -> validate_required(changeset, [:text])
-      _ -> changeset
-    end
-  end
+  defstruct [
+    :id,
+    :role,
+    :text,
+    :passage,
+    :card,
+    :image,
+    :model,
+    blocks: [],
+    images: [],
+    entries: []
+  ]
 end

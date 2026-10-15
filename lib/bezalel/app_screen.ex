@@ -8,7 +8,7 @@ defmodule Bezalel.AppScreen do
   use Mob.Screen
 
   alias Bezalel.{Account, Library, Settings}
-  alias Bezalel.Views.{Conversations, Helpers, Sheets, Study, StudyLibrary, Workshop}
+  alias Bezalel.Views.{Conversations, Helpers, Images, Sheets, Study, StudyLibrary, Workshop}
   alias Bezalel.Views.Settings, as: SettingsView
   alias Mob.Theme.AdaptiveWatcher
   alias MobBezalel.{Palette, UI}
@@ -68,6 +68,9 @@ defmodule Bezalel.AppScreen do
         streams: %{},
         sessions: %{},
         stale: MapSet.new(),
+        edits: %{},
+        images: %{},
+        viewer: nil,
         switched: false,
         move_open: 0
       )
@@ -90,6 +93,7 @@ defmodule Bezalel.AppScreen do
       </Column>
       {toast(@toast, @tab, sa.bottom)}
       {Sheets.render(assigns)}
+      {Images.viewer(assigns)}
     </Box>
     """
   end
@@ -245,7 +249,16 @@ defmodule Bezalel.AppScreen do
   def handle_info({:rho, session_id, event}, socket),
     do: {:noreply, Study.agent_event(session_id, event, socket)}
 
+  def handle_info({:tap, {:image, event}}, socket), do: Images.handle(event, socket)
+  def handle_info({:double_tap, {:image, :zoom}}, socket), do: Images.handle(:zoom, socket)
+
+  def handle_info({:pinch, {:image, :zoom}, payload}, socket),
+    do: {:noreply, Images.pinch(payload, socket)}
+
   def handle_info(_message, socket), do: {:noreply, socket}
+
+  def handle_async({:image, key, size}, result, socket),
+    do: {:noreply, Images.loaded(key, size, result, socket)}
 
   def handle_async({:reply, conversation_id, _ref}, result, socket),
     do: {:noreply, Study.replied(conversation_id, result, socket)}

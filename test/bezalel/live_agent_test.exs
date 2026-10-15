@@ -7,7 +7,7 @@ defmodule Bezalel.LiveAgentTest do
 
   alias Bezalel.Agent.{Live, Reply}
   alias Bezalel.{AppScreen, Library, Repo}
-  alias Bezalel.Library.{Conversation, Message, Tool}
+  alias Bezalel.Library.{Conversation, Tool}
   alias Bezalel.Study.Prompt
   alias Bezalel.Test.{FakeLLM, MemoryStore}
   alias Bezalel.Views.Helpers
@@ -15,7 +15,7 @@ defmodule Bezalel.LiveAgentTest do
   @lookup {:tool_call, "c1", "lookup_verse", %{"reference" => "Exodus 31:2-3"}}
 
   setup do
-    for schema <- [Message, Tool, Conversation], do: Repo.delete_all(schema)
+    for schema <- [Tool, Conversation], do: Repo.delete_all(schema)
     for key <- [:bezalel_conversation, :bezalel_mode, :bezalel_model], do: Mob.State.delete(key)
     MemoryStore.clear()
     :ok = Rho.Auth.put_api_key(:anthropic, "sk-ant-api03-test-key-0123456789")
@@ -197,19 +197,28 @@ defmodule Bezalel.LiveAgentTest do
     assert assigns(view).sessions == %{}
   end
 
-  test "a summary that really ends in an ellipsis keeps it in the next loop's context" do
+  test "after a restart the next question resumes the session: the model sees the reply as written" do
     script([[{:text, "Wait for it…\nThe end."}], [{:text, "Again."}]])
 
     view = AppScreen |> mount_screen() |> ask("First?") |> until()
     assert_receive {:llm_request, _}
     assert block(List.last(assigns(view).messages).blocks, "SUMMARY")["first"] == "Wait for it…"
+    shown = assigns(view).messages
 
-    :ok = Bezalel.Agent.release(assigns(view).conversation.id)
+    # A fresh screen (the app restarted): every loop goes, the conversation
+    # reads back from its session as it was.
+    view = mount_screen(AppScreen)
+
+    for {pid, _} <- Registry.lookup(Live, assigns(view).conversation.id),
+        do: refute(Process.alive?(pid))
+
+    assert Enum.map(assigns(view).messages, & &1.id) == Enum.map(shown, & &1.id)
+    assert List.last(assigns(view).messages).blocks == List.last(shown).blocks
+
     _view = view |> ask("Second?") |> until()
-
     assert_receive {:llm_request, second}
     texts = for m <- second.messages, part <- m.content, do: part.text
-    assert "Wait for it… The end." in texts
+    assert ["First?", "Wait for it…\nThe end.", "Second?"] == Enum.take(texts, -3)
   end
 
   test "a long first sentence is cut in its header and kept whole beneath" do
@@ -323,7 +332,126 @@ defmodule Bezalel.LiveAgentTest do
     assert_receive {:llm_request, second}
     texts = for m <- second.messages, part <- m.content, do: part.text
     refute "First answer." in texts
-    assert "First?\n\nSecond?" in texts
+    assert ["First?", "Second?"] == Enum.take(texts, -2)
     assert block(List.last(assigns(view).messages).blocks, "SUMMARY")["first"] == "Second answer."
+  end
+
+  test "Undo after a delete puts the reply back, for the agent too" do
+    script([[{:text, "First answer."}], [{:text, "Second answer."}]])
+
+    view = AppScreen |> mount_screen() |> ask("First?") |> until()
+    first = List.last(assigns(view).messages)
+    assert_receive {:llm_request, _}
+
+    view = render_info(view, {:tap, {:study, {:delete, first.id}}})
+    refute Enum.any?(assigns(view).messages, &(&1.id == first.id))
+    view = render_info(view, {:tap, {:study, :undo}})
+    assert List.last(assigns(view).messages).id == first.id
+
+    _view = view |> ask("Second?") |> until()
+    assert_receive {:llm_request, second}
+    texts = for m <- second.messages, part <- m.content, do: part.text
+    assert ["First?", "First answer.", "Second?"] == Enum.take(texts, -3)
+  end
+
+  test "a delete made while a reply streams waits for it: hidden now, out of the session after" do
+    script([[{:text, "Partial"}, {:sleep, 200}, {:text, " answer."}], [{:text, "Next."}]])
+
+    view = AppScreen |> mount_screen()
+    opening = hd(assigns(view).messages)
+    view = view |> ask("Who is Bezalel?") |> until(&match?(%{type: :message_update}, &1))
+    view = render_info(view, {:tap, {:study, {:delete, opening.id}}})
+    view = render_info(view, {:tap, {:study, {:confirm_delete, opening.id}}})
+    assert {:pending, _, _} = assigns(view).toast.undo
+    refute Enum.any?(assigns(view).messages, &(&1.id == opening.id))
+
+    view = until(view)
+    refute Enum.any?(assigns(view).messages, &(&1.id == opening.id))
+    refute Enum.any?(Library.messages(assigns(view).conversation.id), &(&1.id == opening.id))
+    # The toast's Undo is the done delete's now.
+    assert %Library.Undo{} = assigns(view).toast.undo
+
+    assert block(List.last(assigns(view).messages).blocks, "SUMMARY")["first"] ==
+             "Partial answer."
+  end
+
+  describe "pictures" do
+    alias Bezalel.Images.Codec
+    alias Bezalel.Test.{PictureTool, Png}
+
+    defp with_picture_tool do
+      Application.put_env(
+        :bezalel,
+        Live,
+        Application.get_env(:bezalel, Live) ++ [tools: Live.tools() ++ [PictureTool]]
+      )
+    end
+
+    defp image_node(view, key), do: find(view, :box, id: "image-" <> key)
+
+    test "a tool's picture shows in the reply, downscaled to the chat's width, and opens full-screen" do
+      script([[{:tool_call, "p1", "draw_lampstand", %{}}], [{:text, "There it is."}]])
+      with_picture_tool()
+
+      view = AppScreen |> mount_screen() |> ask("Draw the lampstand")
+
+      view =
+        until(
+          view,
+          &match?(%{type: :message_end, entry: %{"message" => %{"role" => "toolResult"}}}, &1)
+        )
+
+      assert [%{key: key}] = stream(view).images
+      # Made off the screen process, a placeholder until then.
+      assert assigns(view).images[{key, :chat}] == :loading
+      assert text(view) =~ "Preparing the picture…"
+
+      view = view |> render_async() |> until()
+      reply = List.last(assigns(view).messages)
+      assert [%{key: ^key, mime: "image/png"}] = reply.images
+
+      assert {:ok, %{path: path, width: w, height: h}} = assigns(view).images[{key, :chat}]
+      # 393 dp wide at 3× on the host: (393 - 32) × 3 = 1083 px, from 1200 × 800.
+      assert {w, h} == {1083, 722}
+
+      assert {:ok, %{width: 1083, height: 722}} = path |> File.read!() |> Codec.info()
+
+      assert image_node(view, key)
+      assert_renderable(view)
+
+      view = render_info(view, {:tap, {:image, {:open, key}}})
+      assert %{key: ^key, zoom: 1.0} = assigns(view).viewer
+      assert find(view, :box, id: "viewer-close")
+      view = render_async(view)
+      # The viewer's is made for the screen (twice it, for zooming): the original fits.
+      assert {:ok, %{width: 1200, height: 800}} = assigns(view).images[{key, :viewer}]
+      view = render_info(view, {:double_tap, {:image, :zoom}})
+      assert assigns(view).viewer.zoom == 2.5
+      view = render_info(view, {:pinch, {:image, :zoom}, %{scale: 4.0, phase: :ended}})
+      assert assigns(view).viewer.zoom == 4.0
+      assert_renderable(view)
+      view = render_info(view, {:tap, {:image, :close}})
+      assert assigns(view).viewer == nil
+    end
+
+    test "a picture the model returns shows in its reply, whatever the provider" do
+      png = Png.solid(3000, 1500, {28, 42, 68})
+      script([[{:text, "Here is a drawing."}, {:image, "image/png", png}]])
+
+      view = AppScreen |> mount_screen() |> ask("Draw it") |> until() |> render_async()
+      reply = List.last(assigns(view).messages)
+      assert [%{key: key}] = reply.images
+      assert {:ok, %{width: 1083, height: 542}} = assigns(view).images[{key, :chat}]
+      assert image_node(view, key)
+    end
+
+    test "a picture that can't be read says so instead" do
+      script([[{:text, "Broken."}, {:image, "image/png", "not a png"}]])
+
+      view = AppScreen |> mount_screen() |> ask("Draw it") |> until() |> render_async()
+      [%{key: key}] = List.last(assigns(view).messages).images
+      assert assigns(view).images[{key, :chat}] == :error
+      assert text(view) =~ "This picture can’t be shown."
+    end
   end
 end

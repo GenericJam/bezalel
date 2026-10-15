@@ -7,7 +7,7 @@ defmodule Bezalel.AgentWorkshopTest do
   alias Bezalel.{Repo, Workshop}
 
   setup do
-    for schema <- [Message, Tool, Conversation], do: Repo.delete_all(schema)
+    for schema <- [Tool, Conversation], do: Repo.delete_all(schema)
     :ok
   end
 

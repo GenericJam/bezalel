@@ -1,5 +1,10 @@
 defmodule Bezalel.Library.Conversation do
-  @moduledoc "One study conversation: a week's sermon prep, a word study, ..."
+  @moduledoc """
+  One study conversation on the shelf: a week's sermon prep, a word study, ...
+  Its transcript is its rho session (`session_id`, in the file
+  `session_file` under `Rho.Session.dir/0`; both nil until it's first
+  written); `message_count` is what the shelf shows.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -7,9 +12,9 @@ defmodule Bezalel.Library.Conversation do
     field :name, :string
     field :kicker, :string
     field :kind, :string
-    # The position the next message gets; never handed out twice.
-    field :next_position, :integer, default: 1
-    has_many :messages, Bezalel.Library.Message
+    field :session_id, :string
+    field :session_file, :string
+    field :message_count, :integer, default: 0
     timestamps(type: :utc_datetime_usec)
   end
 

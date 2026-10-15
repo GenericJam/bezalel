@@ -15,14 +15,14 @@ defmodule Bezalel.Agent do
   """
 
   @doc """
-  Asks the next reply of `conversation_id`: `messages` are its messages,
-  ending with the question (the user messages after the last reply).
+  Asks `text` in `conversation_id`: the question goes into the
+  conversation's session after what's there, and the reply follows it.
   `model` is a `Bezalel.Models` id. The loop's events go to `subscriber`.
   Returns the loop's session id, which the events carry.
   """
   @callback ask(
               conversation_id :: integer(),
-              messages :: [Bezalel.Library.Message.t()],
+              text :: String.t(),
               model :: String.t(),
               subscriber :: pid()
             ) :: {:ok, String.t()} | {:error, term()}
@@ -34,9 +34,9 @@ defmodule Bezalel.Agent do
   @callback stop(conversation_id :: integer()) :: :ok
 
   @doc """
-  Forgets the conversation's agent state, so its next reply starts from
-  the conversation as stored (after a delete or an undo, or once it's no
-  longer open).
+  Lets go of the conversation's loop (its session stays), so the session
+  can be written by Bezalel (a delete, an undo) or once it's no longer
+  open; the next question resumes the session as stored.
   """
   @callback release(conversation_id :: integer()) :: :ok
 
@@ -53,10 +53,9 @@ defmodule Bezalel.Agent do
   end
 
   @doc "See the `c:ask/4` callback."
-  @spec ask(integer(), [Bezalel.Library.Message.t()], String.t(), pid()) ::
-          {:ok, String.t()} | {:error, term()}
-  def ask(conversation_id, messages, model, subscriber),
-    do: impl().ask(conversation_id, messages, model, subscriber)
+  @spec ask(integer(), String.t(), String.t(), pid()) :: {:ok, String.t()} | {:error, term()}
+  def ask(conversation_id, text, model, subscriber),
+    do: impl().ask(conversation_id, text, model, subscriber)
 
   @doc "See the `c:steer/2` callback."
   @spec steer(integer(), String.t()) :: :ok | {:error, :idle}

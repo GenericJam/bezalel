@@ -1,25 +1,30 @@
 defmodule Bezalel.Views.Study do
   @moduledoc """
-  The Study tab: the conversation with the agent. Replies fold to their type
-  and first line; a cited passage's highlighted words open the Hebrew; any
-  message can be copied or deleted from its ⋯ menu (deleting further up asks
-  first, and every delete can be undone).
+  The Study tab: the conversation with the agent, read from its session
+  (`Bezalel.Library`). Replies fold to their type and first line; a cited
+  passage's highlighted words open the Hebrew; pictures show at the chat's
+  width and open full-screen (`Bezalel.Views.Images`); any message can be
+  copied or deleted from its ⋯ menu (deleting further up asks first, and
+  every delete can be undone).
 
   A live reply (`Bezalel.Agent.live?/1`) streams in: rho's loop events
   are folded into a `Bezalel.Agent.Reply` per conversation (`streams`,
   found by the loop's session id in `sessions`) and drawn below the stored
-  messages, with a stop button in the composer. A message sent while it
-  streams steers it; once the loop takes it in, the reply so far is stored,
-  then the message, and the rest streams as the next reply. When the run
-  ends the reply is stored with its blocks and passage card; a failed one
-  stays as its error, with Try again.
+  messages, with a stop button in the composer; the loop writes it into
+  the session as it goes. A message sent while it streams steers it; once
+  the loop takes it in, the reply so far shows from the session, then the
+  message, and the rest streams as the next reply. A failed reply stays as
+  its error, with Try again (the question asked anew). A delete or undo
+  made while a reply streams in that conversation waits for it to end (the
+  loop holds the session), the deleted message hidden meanwhile
+  (`edits`).
   """
   import Mob.Sigil
 
   alias Bezalel.{Agent, Library, Models, Scripture}
   alias Bezalel.Agent.{Card, Reply, Storyboard}
   alias Bezalel.Study.{DB, Lexicon}
-  alias Bezalel.Views.Helpers
+  alias Bezalel.Views.{Helpers, Images}
   alias Mob.Socket
   alias MobBezalel.{Icons, UI}
   alias Rho.Session
@@ -139,9 +144,12 @@ defmodule Bezalel.Views.Study do
   end
 
   defp message(%{role: :user} = m, assigns) do
+    bubble = if m.text in [nil, ""], do: [], else: [UI.user_bubble(m.text)]
+
     ~MOB"""
     <Column gap={6} fill_width={true}>
-      {UI.user_bubble(m.text)}
+      {bubble}
+      {Images.render(m.images, assigns)}
       <Box align="top_trailing" fill_width={true}>
         {actions(m, assigns, nil)}
       </Box>
@@ -157,14 +165,15 @@ defmodule Bezalel.Views.Study do
       {blocks}
       {passage(m.passage)}
       {card(m.card)}
+      {Images.render(m.images, assigns)}
       {image(m)}
       {actions(m, assigns, Models.attribution(m.model))}
     </Column>
     """
   end
 
-  # The reply streaming in (or failed): its blocks and card so far, the
-  # messages waiting to steer it, and its error.
+  # The reply streaming in (or failed): its blocks, card and pictures so
+  # far, the messages waiting to steer it, and its error.
   defp live(nil, _assigns), do: []
 
   defp live(r, assigns) do
@@ -176,6 +185,7 @@ defmodule Bezalel.Views.Study do
     <Column gap={8} fill_width={true}>
       {blocks}
       {card(r.card)}
+      {Images.render(r.images, assigns)}
       {pending}
       {failure(r)}
     </Column>
@@ -525,20 +535,18 @@ defmodule Bezalel.Views.Study do
   def handle({:confirm_delete, id}, socket),
     do: {:noreply, socket |> Socket.assign(:sheet, nil) |> delete(id)}
 
+  # A delete still waiting for the reply in its conversation is just
+  # dropped; a done one is undone now, or once that conversation's reply
+  # ends.
   def handle(:undo, socket) do
-    case socket.assigns.toast do
-      %{undo: %Library.Message{} = m} ->
-        {:ok, _} = Library.restore_message(m)
+    socket =
+      case socket.assigns.toast do
+        %{undo: {:pending, cid, id}} -> drop_edit(socket, cid, {:delete, [id]})
+        %{undo: %Library.Undo{conversation_id: cid} = undo} -> edit(socket, cid, {:undo, undo})
+        _ -> socket
+      end
 
-        {:noreply,
-         socket
-         |> Socket.assign(:toast, nil)
-         |> Helpers.reload_messages()
-         |> forget(m.conversation_id)}
-
-      _ ->
-        {:noreply, socket}
-    end
+    {:noreply, socket |> Socket.assign(:toast, nil) |> Helpers.reload_messages()}
   end
 
   def handle(:ask_again, socket) do
@@ -602,14 +610,19 @@ defmodule Bezalel.Views.Study do
     end
   end
 
+  # Live, the loop writes the question into the session; scripted, it's
+  # written here and the storyboard answers it.
   defp ask(socket, text) do
-    {:ok, _} = Library.add_message(socket.assigns.conversation, %{role: :user, text: text})
+    %{id: cid} = conversation = socket.assigns.conversation
+    socket = socket |> Socket.assign(draft: "", menu: nil) |> drop_stream(cid)
 
-    socket
-    |> Socket.assign(draft: "", menu: nil)
-    |> drop_stream(socket.assigns.conversation.id)
-    |> Helpers.reload_messages()
-    |> respond()
+    if Agent.live?(socket.assigns.account) do
+      socket |> respond_live(text) |> Helpers.reload_messages()
+    else
+      socket = release(socket, cid)
+      {:ok, _} = Library.add_message(conversation, %{role: :user, text: text})
+      socket |> Helpers.reload_messages() |> respond_scripted()
+    end
   end
 
   defp steer(socket, cid, text) do
@@ -628,45 +641,69 @@ defmodule Bezalel.Views.Study do
   end
 
   @doc """
-  Asks for the next reply to the open conversation, bound to that
-  conversation and the model chosen now: its result lands there even if
-  the user has moved on. Live (`Bezalel.Agent.live?/1`), the reply streams
-  as loop events (`agent_event/3`); without a model the storyboard's comes
-  back through `handle_async({:reply, ...})` (`replied/3`). Each
-  conversation has at most one reply in flight, and replies in different
-  conversations run side by side.
+  Asks again for the reply to the open conversation's last question (Try
+  again, Ask again), bound to that conversation and the model chosen now:
+  its result lands there even if the user has moved on. Live
+  (`Bezalel.Agent.live?/1`), the question is taken back off the session
+  and asked anew, and the reply streams as loop events (`agent_event/3`);
+  without a model the storyboard's comes back through
+  `handle_async({:reply, ...})` (`replied/3`). Each conversation has at
+  most one reply in flight, and replies in different conversations run
+  side by side.
   """
   def respond(socket) do
-    if Agent.live?(socket.assigns.account),
-      do: respond_live(socket),
-      else: respond_scripted(socket)
+    cid = socket.assigns.conversation.id
+
+    if Agent.live?(socket.assigns.account) do
+      socket = release(socket, cid)
+
+      case Library.take_question(cid) do
+        {:ok, text} -> socket |> respond_live(text) |> Helpers.reload_messages()
+        :none -> Helpers.reload_messages(socket)
+      end
+    else
+      respond_scripted(socket)
+    end
   end
 
-  defp respond_live(socket) do
+  defp respond_live(socket, text) do
     %{id: cid} = socket.assigns.conversation
     model = Helpers.model(socket)
 
     if Models.available?(model, socket.assigns.account) do
-      case Agent.ask(cid, socket.assigns.messages, model.id, self()) do
+      case Agent.ask(cid, text, model.id, self()) do
         {:ok, session_id} ->
+          :ok = Library.touch(cid)
+
           socket
           |> Socket.assign(:sessions, Map.put(socket.assigns.sessions, session_id, cid))
           |> put_stream(cid, Reply.new(cid, model.id, session_id))
 
         {:error, reason} ->
-          put_stream(
-            socket,
-            cid,
-            Reply.failed(cid, model.id, "The agent couldn't start: #{inspect(reason)}")
-          )
+          error = "The agent couldn't start: #{inspect(reason)}"
+
+          socket
+          |> keep_question(cid, text)
+          |> put_stream(cid, Reply.failed(cid, model.id, error))
       end
     else
-      text =
+      error =
         "#{model.name} needs a #{Models.needs(model.provider)}. Add one in Settings → " <>
           "Account, or choose a model you have access to."
 
-      put_stream(socket, cid, Reply.failed(cid, model.id, text))
+      socket |> keep_question(cid, text) |> put_stream(cid, Reply.failed(cid, model.id, error))
     end
+  end
+
+  # A question no loop took in stays in the conversation, for Try again.
+  defp keep_question(socket, cid, text) do
+    socket = release(socket, cid)
+
+    with %Library.Conversation{} = conversation <- Library.get_conversation(cid) do
+      {:ok, _} = Library.add_message(conversation, %{role: :user, text: text})
+    end
+
+    socket
   end
 
   defp respond_scripted(socket) do
@@ -744,22 +781,16 @@ defmodule Bezalel.Views.Study do
   defp on_event(cid, reply, %{type: :agent_end} = event, socket),
     do: finish(socket, cid, Reply.apply(reply, event))
 
-  defp on_event(cid, reply, event, socket), do: put_stream(socket, cid, Reply.apply(reply, event))
-
-  # The loop took a steering message in: the reply so far is done, the
-  # message follows it, and the run goes on as the next reply.
-  defp steered(socket, cid, reply, text) do
-    socket = store(socket, cid, reply)
-
-    case Library.get_conversation(cid) do
-      nil -> :ok
-      conversation -> {:ok, _} = Library.add_message(conversation, %{role: :user, text: text})
-    end
-
-    socket
-    |> put_stream(cid, Reply.continue(reply, text))
-    |> reload_if_open(cid)
+  defp on_event(cid, reply, event, socket) do
+    reply = Reply.apply(reply, event)
+    socket |> put_stream(cid, reply) |> Images.load(reply.images)
   end
+
+  # The loop took a steering message in: the reply so far is done (the
+  # chat reads it from the session), the message follows it, and the run
+  # goes on as the next reply.
+  defp steered(socket, cid, reply, text),
+    do: store(socket, cid, reply, Reply.continue(reply, text))
 
   # Messages sent as the run was ending: after a normal end the loop runs
   # them next, as a new run; at its limits (`:max_iterations`, `:cost_cap`)
@@ -767,7 +798,7 @@ defmodule Bezalel.Views.Study do
   # end may have started a run the screen won't follow: the loop goes too.
   defp finish(socket, cid, %Reply{status: :done, reason: reason} = reply)
        when reply.pending == [] or reason in [:max_iterations, :cost_cap] do
-    socket = socket |> store(cid, reply) |> drop_stream(cid)
+    socket = store(socket, cid, reply, nil)
 
     socket =
       if reply.pending == [], do: release_if_unused(socket, cid), else: release(socket, cid)
@@ -775,28 +806,29 @@ defmodule Bezalel.Views.Study do
     unsend(socket, cid, reply.pending)
   end
 
-  defp finish(socket, cid, %Reply{status: :done} = reply) do
-    socket
-    |> store(cid, reply)
-    |> put_stream(cid, %{Reply.continue(reply, "") | pending: reply.pending})
-  end
+  defp finish(socket, cid, %Reply{status: :done} = reply),
+    do: store(socket, cid, reply, %{Reply.continue(reply, "") | pending: reply.pending})
 
-  # Stopped: what streamed is kept. The loop goes (its session holds the
-  # cut-off turn); the next question starts one from the conversation.
+  # Stopped: what streamed is kept (the loop wrote the cut-off turn). The
+  # loop goes; the next question resumes the session.
   defp finish(socket, cid, %Reply{status: :stopped} = reply) do
     socket
     |> release(cid)
-    |> store(cid, reply)
-    |> drop_stream(cid)
+    |> store(cid, reply, nil)
     |> unsend(cid, reply.pending)
   end
 
-  # Failed: the error stays in the conversation, with Try again (a fresh
-  # loop from the conversation as stored).
+  # Failed: the error stays in the chat, with Try again; the failed run's
+  # entries leave the session's branch (the loop is idle), and Try again
+  # asks the question anew.
   defp finish(socket, cid, %Reply{status: :error} = reply) do
+    :ok = Library.drop_failed(cid)
+
     socket
     |> release(cid)
+    |> drop_stream(cid)
     |> put_stream(cid, %{reply | pending: []})
+    |> reload_if_open(cid)
     |> unsend(cid, reply.pending)
   end
 
@@ -822,31 +854,33 @@ defmodule Bezalel.Views.Study do
     end
   end
 
-  # Stores the reply (its blocks and card), keeping which blocks were open.
-  defp store(socket, cid, reply) do
-    with true <- Reply.any?(reply),
-         %Library.Conversation{} = conversation <- Library.get_conversation(cid),
-         {:ok, message} <-
-           Library.add_message(conversation, %{
-             role: :agent,
-             blocks: Reply.blocks(reply),
-             card: reply.card,
-             model: reply.model
-           }) do
-      prefix = live_id(cid) <> ":"
+  # A reply (or the part of it before a steering message) is in the
+  # session: the stream gives way to it (or to `next`, the run's next
+  # reply), keeping which of its blocks were open.
+  defp store(socket, cid, reply, next) do
+    :ok = Library.touch(cid)
+    prefix = live_id(cid) <> ":"
+    open = for key <- socket.assigns.expanded, String.starts_with?(key, prefix), do: key
 
-      expanded =
-        socket.assigns.expanded
-        |> MapSet.new(&String.replace_prefix(&1, prefix, "#{message.id}:"))
-        |> MapSet.union(Helpers.summaries_open([message]))
+    socket = drop_stream(socket, cid)
+    socket = if next, do: put_stream(socket, cid, next), else: socket
+    socket = reload_if_open(socket, cid)
 
-      socket
-      |> Socket.assign(:expanded, expanded)
-      |> reload_if_open(cid)
-      |> Helpers.refresh()
-    else
-      _ -> socket
-    end
+    stored =
+      Enum.find(socket.assigns.messages, fn m ->
+        cid == socket.assigns.conversation.id and reply.seen != [] and
+          hd(reply.seen) in m.entries
+      end)
+
+    expanded =
+      if stored,
+        do:
+          socket.assigns.expanded
+          |> MapSet.union(MapSet.new(open, &String.replace_prefix(&1, prefix, "#{stored.id}:")))
+          |> MapSet.union(Helpers.summaries_open([stored])),
+        else: socket.assigns.expanded
+
+    socket |> Socket.assign(:expanded, expanded) |> Helpers.refresh()
   end
 
   defp reload_if_open(%{assigns: %{conversation: %{id: cid}}} = socket, cid),
@@ -854,27 +888,83 @@ defmodule Bezalel.Views.Study do
 
   defp reload_if_open(socket, _cid), do: socket
 
-  # The loop of a conversation that's no longer open, or whose messages
-  # changed while it ran, goes once its reply is done.
+  # The loop of a conversation that's no longer open, or with edits
+  # waiting for its reply, goes once its reply is done.
   defp release_if_unused(socket, cid) do
     if cid != socket.assigns.conversation.id or MapSet.member?(socket.assigns.stale, cid),
       do: release(socket, cid),
       else: socket
   end
 
-  # A message deleted or put back: the agent's context no longer matches
-  # the conversation, so its loop goes (now, or when its reply is done).
-  defp forget(socket, cid) do
+  # A delete or an undo (`op`) rewrites the session, which a loop must not
+  # be holding: with no reply streaming the loop goes and it's done now;
+  # otherwise it waits for the reply to end (the chat already hides a
+  # deleted message).
+  defp edit(socket, cid, op) do
+    socket =
+      Socket.assign(socket, :edits, Map.update(socket.assigns.edits, cid, [op], &(&1 ++ [op])))
+
     if Reply.running?(socket.assigns.streams[cid]),
       do: Socket.assign(socket, :stale, MapSet.put(socket.assigns.stale, cid)),
       else: release(socket, cid)
   end
 
-  # The conversation's loop goes, and with it its sessions and stale mark.
+  defp drop_edit(socket, cid, op) do
+    edits =
+      case Map.get(socket.assigns.edits, cid, []) -- [op] do
+        [] -> Map.delete(socket.assigns.edits, cid)
+        ops -> Map.put(socket.assigns.edits, cid, ops)
+      end
+
+    Socket.assign(socket, :edits, edits)
+  end
+
+  # The conversation's loop goes, and with it its sessions and stale mark;
+  # then the edits that waited for it are made.
   defp release(socket, cid) do
     :ok = Agent.release(cid)
     sessions = Map.reject(socket.assigns.sessions, fn {_, c} -> c == cid end)
-    Socket.assign(socket, sessions: sessions, stale: MapSet.delete(socket.assigns.stale, cid))
+
+    socket
+    |> Socket.assign(sessions: sessions, stale: MapSet.delete(socket.assigns.stale, cid))
+    |> apply_edits(cid)
+  end
+
+  defp apply_edits(socket, cid) do
+    case Map.pop(socket.assigns.edits, cid) do
+      {nil, _} ->
+        socket
+
+      {ops, edits} ->
+        socket = Socket.assign(socket, :edits, edits)
+
+        ops
+        |> Enum.reduce(socket, &apply_edit(&2, cid, &1))
+        |> reload_if_open(cid)
+    end
+  end
+
+  defp apply_edit(socket, cid, {:delete, ids}) do
+    case Library.delete_messages(cid, ids) do
+      {:ok, undo} -> undo_ready(socket, cid, ids, undo)
+      {:error, :not_found} -> socket
+    end
+  end
+
+  defp apply_edit(socket, _cid, {:undo, undo}) do
+    _ = Library.restore(undo)
+    socket
+  end
+
+  # The toast's Undo of a delete that was waiting now undoes the done one.
+  defp undo_ready(socket, cid, ids, undo) do
+    case socket.assigns.toast do
+      %{undo: {:pending, ^cid, id}} = toast ->
+        if id in ids, do: Socket.assign(socket, :toast, %{toast | undo: undo}), else: socket
+
+      _ ->
+        socket
+    end
   end
 
   # A reply starting (a new one, or the next after a steer) opens its
@@ -905,11 +995,17 @@ defmodule Bezalel.Views.Study do
 
   defp last?(messages, id), do: match?(%{id: ^id}, List.last(messages))
 
+  # The toast's Undo starts as the waiting delete; made now (no reply
+  # streaming), it becomes the done one's.
   defp delete(socket, id) do
-    last? = last?(socket.assigns.messages, id)
+    cid = socket.assigns.conversation.id
+    messages = socket.assigns.messages
 
-    case Library.delete_message(id) do
-      {:ok, m} ->
+    case Enum.find(messages, &(&1.id == id)) do
+      nil ->
+        Helpers.reload_messages(socket)
+
+      m ->
         text =
           if m.role == :agent,
             do: "Reply deleted. The agent won’t see it.",
@@ -917,12 +1013,12 @@ defmodule Bezalel.Views.Study do
 
         socket
         |> Socket.assign(:menu, nil)
+        |> Helpers.toast(text,
+          undo: {:pending, cid, id},
+          ask_again: m.role == :agent and last?(messages, id)
+        )
+        |> edit(cid, {:delete, [id]})
         |> Helpers.reload_messages()
-        |> forget(m.conversation_id)
-        |> Helpers.toast(text, undo: m, ask_again: m.role == :agent and last?)
-
-      {:error, :not_found} ->
-        Helpers.reload_messages(socket)
     end
   end
 

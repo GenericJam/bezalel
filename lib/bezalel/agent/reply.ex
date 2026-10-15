@@ -8,11 +8,16 @@ defmodule Bezalel.Agent.Reply do
   THINKING. A `lookup_verse` or `word_study` result that names a passage
   becomes the passage card (`Bezalel.Agent.Card`).
 
+  Pictures in a turn or a tool result are listed in `images`.
+
   Pure: `Bezalel.Views.Study` keeps one per conversation with a reply in
-  flight and persists `blocks/1` and the card when the run ends.
+  flight. The loop writes the reply to the conversation's session as it
+  goes; once stored, `Bezalel.Library.Transcript` draws it with this same
+  fold over its entries.
   """
 
   alias Bezalel.Agent.Card
+  alias Bezalel.Library.Transcript
   alias Bezalel.Study.Patterns
   alias Rho.Session
 
@@ -28,6 +33,9 @@ defmodule Bezalel.Agent.Reply do
           text: String.t(),
           summary: String.t(),
           card: Card.t() | nil,
+          images: [Bezalel.Library.Message.image()],
+          seen: [String.t()],
+          kept: [String.t()],
           pending: [String.t()],
           retry: String.t() | nil,
           error: String.t() | nil,
@@ -44,6 +52,9 @@ defmodule Bezalel.Agent.Reply do
     text: "",
     summary: "",
     card: nil,
+    images: [],
+    seen: [],
+    kept: [],
     pending: [],
     retry: nil,
     error: nil,
@@ -77,7 +88,9 @@ defmodule Bezalel.Agent.Reply do
   def apply(r, %{type: :message_update, kind: :text, delta: delta}),
     do: %{r | text: r.text <> delta, retry: nil}
 
-  def apply(r, %{type: :message_end, entry: %{"message" => %{"role" => "assistant"} = m}}) do
+  def apply(r, %{type: :message_end, entry: %{"message" => %{"role" => "assistant"} = m} = entry}) do
+    r = r |> saw(entry) |> add_images(entry)
+
     cond do
       m["stopReason"] == "error" ->
         %{r | error: r.error || m["errorMessage"]}
@@ -90,7 +103,12 @@ defmodule Bezalel.Agent.Reply do
     end
   end
 
+  def apply(r, %{type: :message_end, entry: %{"message" => %{"role" => "toolResult"}} = entry}),
+    do: r |> saw(entry) |> add_images(entry)
+
   def apply(r, %{type: :message_end, entry: %{"type" => "custom_message"} = entry}) do
+    r = saw(r, entry)
+
     if Session.notice_kind(entry) == :error,
       do: %{r | error: r.error || Session.text(entry["content"])},
       else: r
@@ -118,7 +136,14 @@ defmodule Bezalel.Agent.Reply do
   end
 
   def apply(r, %{type: :tool_execution_end, id: id, name: name} = event) do
-    card = if event.is_error, do: nil, else: Card.from_tool(name, event[:details])
+    # Replayed from the session (`Bezalel.Library.Transcript`), the card
+    # is the one kept with the result; live, it's built from the details.
+    card =
+      cond do
+        event.is_error -> nil
+        Map.has_key?(event, :card) -> event.card
+        true -> Card.from_tool(name, event[:details])
+      end
 
     items =
       Enum.map(r.items, fn
@@ -153,18 +178,23 @@ defmodule Bezalel.Agent.Reply do
   def running?(%__MODULE__{status: :running}), do: true
   def running?(_reply), do: false
 
-  @doc "Whether there's anything to keep: a block or a card."
+  @doc "Whether there's anything to show: a block, a card or a picture."
   @spec any?(t()) :: boolean()
-  def any?(r), do: blocks(r) != [] or r.card != nil
+  def any?(r), do: blocks(r) != [] or r.card != nil or r.images != []
 
   @doc """
   Starts over after the steering message `text` was injected: the reply so
-  far is done (it's persisted as its own message), the run goes on as a new
-  reply. `pending` loses `text`.
+  far is done (the chat shows it from the session now: its entries move to
+  `kept`), the run goes on as a new reply. `pending` loses `text`.
   """
   @spec continue(t(), String.t()) :: t()
   def continue(r, text) do
-    %{new(r.conversation_id, r.model, r.session_id) | turn: r.turn, pending: r.pending -- [text]}
+    %{
+      new(r.conversation_id, r.model, r.session_id)
+      | turn: r.turn,
+        pending: r.pending -- [text],
+        kept: r.kept ++ r.seen
+    }
   end
 
   @doc """
@@ -297,6 +327,16 @@ defmodule Bezalel.Agent.Reply do
     items = if found?, do: items, else: items ++ [%{id: id, kind: :think, text: fun.("")}]
     %{r | items: items}
   end
+
+  # Pictures in a model's turn or a tool's result, keyed as the stored
+  # reply's are (`Bezalel.Library.Message`).
+  defp add_images(r, entry),
+    do: %{r | images: r.images ++ Transcript.images([entry], r.session_id || "")}
+
+  # The session entries the loop wrote for this reply so far (`seen`); the
+  # chat leaves them to the stream while it runs.
+  defp saw(r, %{"id" => id}), do: %{r | seen: r.seen ++ [id]}
+  defp saw(r, _entry), do: r
 
   defp discard_attempt(r) do
     id = "think-#{r.turn}"

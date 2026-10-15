@@ -4,8 +4,9 @@ defmodule Bezalel.Test.FakeLLM do
   reply from the script and plays its steps through the loop's sink.
 
   Steps: `{:text, s}`, `{:thinking, s}`, `{:tool_call, id, name, args}`,
-  `{:sleep, ms}`, `:block` (never returns; the loop must kill it),
-  `{:error, error}` (returns it).
+  `{:image, mime, bytes}` (a picture the model returns), `{:sleep, ms}`,
+  `:block` (never returns; the loop must kill it), `{:error, error}`
+  (returns it).
 
   Every call sends the test `{:llm_request, request}`.
   """
@@ -28,7 +29,7 @@ defmodule Bezalel.Test.FakeLLM do
 
     case reply do
       :exhausted -> {:error, {:other, "fake script exhausted"}}
-      steps -> play(steps, sink, %{text: "", thinking: "", tool_calls: []})
+      steps -> play(steps, sink, %{text: "", thinking: "", tool_calls: [], images: []})
     end
   end
 
@@ -49,6 +50,9 @@ defmodule Bezalel.Test.FakeLLM do
       {:tool_call, id, name, args} ->
         call = %{"id" => id, "name" => name, "arguments" => args}
         play(rest, sink, %{acc | tool_calls: acc.tool_calls ++ [call]})
+
+      {:image, mime, bytes} ->
+        play(rest, sink, %{acc | images: acc.images ++ [{mime, bytes}]})
 
       {:sleep, ms} ->
         Process.sleep(ms)

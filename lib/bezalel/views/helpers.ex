@@ -3,19 +3,50 @@ defmodule Bezalel.Views.Helpers do
 
   alias Bezalel.{Agent, Library, Models, Settings}
   alias Bezalel.Agent.Reply
-  alias Bezalel.Views.Conversations
+  alias Bezalel.Views.{Conversations, Images}
   alias Mob.Socket
 
   @toast_ms 4000
 
-  @doc "Re-reads the open conversation's messages."
+  @doc """
+  Re-reads the open conversation's messages (`visible_messages/2`) and
+  starts loading their pictures.
+  """
   def reload_messages(socket) do
-    Socket.assign(socket, :messages, Library.messages(socket.assigns.conversation.id))
+    socket
+    |> Socket.assign(:messages, visible_messages(socket, socket.assigns.conversation.id))
+    |> Images.load()
   end
 
   @doc """
-  Shows a toast for four seconds. `opts`: `:undo` (a deleted message to put
-  back), `:ask_again` (offer a fresh reply).
+  A conversation's messages as the chat shows them: without the ones
+  whose delete waits for the reply streaming in it (`:edits`), and, while
+  a reply streams, without what the loop has already written of it (the
+  stream draws that), keeping the parts of the run that are done (a reply
+  steered into the next).
+  """
+  def visible_messages(socket, cid) do
+    hidden = for {:delete, ids} <- Map.get(socket.assigns.edits, cid, []), id <- ids, do: id
+
+    cid
+    |> Library.messages()
+    |> without_stream(socket.assigns.streams[cid])
+    |> Enum.reject(&(&1.id in hidden))
+  end
+
+  # A run starts with its question: what follows the last one is the run's.
+  defp without_stream(messages, %Reply{status: :running, kept: kept}) do
+    {streaming, done} = messages |> Enum.reverse() |> Enum.split_while(&(&1.role == :agent))
+    Enum.reverse(done) ++ Enum.filter(Enum.reverse(streaming), &(&1.entries -- kept == []))
+  end
+
+  defp without_stream(messages, _reply), do: messages
+
+  @doc """
+  Shows a toast for four seconds. `opts`: `:undo` (what puts a deleted
+  message back: a `Bezalel.Library.Undo`, or `{:pending, conversation_id,
+  message_id}` for a delete still waiting for its conversation's reply),
+  `:ask_again` (offer a fresh reply).
   """
   def toast(socket, text, opts \\ []) do
     ref = make_ref()
@@ -72,7 +103,7 @@ defmodule Bezalel.Views.Helpers do
   """
   def open_conversation(socket, conversation) do
     Settings.put_conversation_id(conversation.id)
-    messages = Library.messages(conversation.id)
+    messages = visible_messages(socket, conversation.id)
     live_summary = live_id(conversation.id) <> ":sum"
 
     expanded =
@@ -92,6 +123,7 @@ defmodule Bezalel.Views.Helpers do
     |> Socket.assign(:expanded, expanded)
     |> Socket.assign(:tab, :study)
     |> release_unused()
+    |> Images.load()
   end
 
   defp release_unused(socket) do
