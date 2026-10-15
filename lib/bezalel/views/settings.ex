@@ -122,7 +122,7 @@ defmodule Bezalel.Views.Settings do
       UI.card(
         [
           ~MOB(<Text
-  text="Or use an API key. It stays in this phone's secure store; a key replaces a sign-in to the same provider."
+  text="Or use an API key. It stays in this phone's secure store. A provider keeps one: a key and a sign-in replace each other."
   text_size={14}
   line_height={1.5}
   text_color={:on_surface}
@@ -172,13 +172,24 @@ defmodule Bezalel.Views.Settings do
 
       _ ->
         tap = {self(), {:settings, {:sign_in, provider}}}
-        what = if provider == :anthropic, do: "Pro or Max", else: "Plus or Pro"
+
+        what =
+          cond do
+            match?(%{type: :api_key}, assigns.account[provider]) ->
+              "Signing in replaces your #{Account.key_name(provider)} key"
+
+            provider == :anthropic ->
+              "Pro or Max subscription"
+
+            true ->
+              "Plus or Pro subscription"
+          end
 
         row = ~MOB"""
         <Row gap={12} align={:center} fill_width={true}>
           <Column gap={2} weight={1}>
             <Text text={name} font={:ui_medium} text_size={15} text_color={:on_surface} />
-            <Text text={what <> " subscription"} text_size={12} text_color={:muted} />
+            <Text text={what} text_size={12} text_color={:muted} />
           </Column>
           {UI.pill_button("Sign in", tap, :outline, height: 36, fill: false, text_size: 13)}
         </Row>
@@ -296,8 +307,7 @@ defmodule Bezalel.Views.Settings do
 
     per_model =
       for r <- rows do
-        model = Models.get(r.model)
-        name = Models.attribution(r.model)
+        {name, dot} = usage_label(r.model)
         figures = "#{tokens(r.today)} today · #{tokens(r.total)}"
 
         ~MOB"""
@@ -306,7 +316,7 @@ defmodule Bezalel.Views.Settings do
             <Text text={name} font={:ui_medium} text_size={13} text_color={:on_surface} weight={1} />
             <Text text={figures} text_size={13} text_color={:muted} />
           </Row>
-          {UI.meter(if(total > 0, do: r.total / total, else: 0.0), model.dot)}
+          {UI.meter(if(total > 0, do: r.total / total, else: 0.0), dot)}
         </Column>
         """
       end
@@ -327,6 +337,24 @@ defmodule Bezalel.Views.Settings do
     )
   end
 
+  # Usage is kept under the spec a call used: the catalog's name for it, or
+  # the spec itself for a model the catalog no longer lists.
+  defp usage_label(spec) do
+    case Models.lookup(spec) do
+      %{name: name, dot: dot} ->
+        {name, dot}
+
+      nil ->
+        provider =
+          case Auth.provider_for_model(spec) do
+            {:ok, provider} -> provider
+            :error -> nil
+          end
+
+        {spec, Models.dot(provider) || :muted}
+    end
+  end
+
   @doc "A token count as Settings shows it: `950`, `12.4k`, `1.2M`."
   @spec tokens(non_neg_integer()) :: String.t()
   def tokens(n) when n < 1000, do: Integer.to_string(n)
@@ -342,7 +370,7 @@ defmodule Bezalel.Views.Settings do
     note =
       if Models.available?(model, account),
         do: Auth.label(model.provider),
-        else: "Needs a " <> Models.needs(model.provider)
+        else: "Needs your " <> Models.needs(model.provider)
 
     ~MOB"""
     <Box
@@ -404,7 +432,7 @@ defmodule Bezalel.Views.Settings do
         {:noreply, Socket.assign(socket, login: provider, login_code: "")}
 
       {:error, reason} ->
-        {:noreply, Helpers.toast(socket, "Couldn't start the sign-in: #{inspect(reason)}")}
+        {:noreply, Helpers.toast(socket, begin_error(reason))}
     end
   end
 
@@ -486,6 +514,13 @@ defmodule Bezalel.Views.Settings do
         Helpers.toast(socket, "Couldn't remove it: #{Auth.describe_error(reason)}")
     end
   end
+
+  # The sign-in listens on the provider's fixed localhost port; another
+  # app's sign-in in progress can hold it.
+  defp begin_error({:listen, _port, :eaddrinuse}),
+    do: "Another app is signing in right now. Finish or close that sign-in, then try again."
+
+  defp begin_error(_reason), do: "Couldn't start the sign-in. Try again."
 
   defp paste_error(:no_code), do: "Paste the code the Claude page shows."
   defp paste_error(:state_mismatch), do: "That code is from another sign-in. Tap Sign in again."

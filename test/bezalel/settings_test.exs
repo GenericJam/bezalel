@@ -111,6 +111,11 @@ defmodule Bezalel.SettingsTest do
       assert find(view, :text_field, placeholder: "Paste your key", secure: true)
     end
 
+    test "with an Anthropic key, Claude's sign-in says it replaces the key" do
+      :ok = Rho.Auth.put_api_key(:anthropic, "sk-ant-api03-abcdefghijklmnop")
+      assert text(settings()) =~ "Signing in replaces your Anthropic key"
+    end
+
     test "saving an empty key asks for one and stores nothing" do
       view = settings()
       view = render_info(view, {:change, {:settings, {:key, :google}}, "   "})
@@ -128,7 +133,7 @@ defmodule Bezalel.SettingsTest do
       assert text(view) =~ "No models yet."
       # The default is Claude; without access it says what it needs.
       view = render_info(view, {:tap, :sheet})
-      assert text(view) =~ "Needs a Claude sign-in or Anthropic API key"
+      assert text(view) =~ "Needs your Claude sign-in or Anthropic API key"
 
       view =
         render_info(
@@ -172,7 +177,11 @@ defmodule Bezalel.SettingsTest do
         "days" => %{today => %{"anthropic:claude-haiku-4-5-20251001" => counters.(800, 400)}},
         "total" => %{
           "anthropic:claude-haiku-4-5-20251001" => counters.(9_000, 3_400),
-          "google:gemini-3.5-flash" => counters.(300, 200)
+          "google:gemini-3.5-flash" => counters.(300, 200),
+          # An alias of the catalog's dated id (counted with it), and a model
+          # the catalog no longer lists (shown by its spec).
+          "anthropic:claude-haiku-4-5" => counters.(50, 50),
+          "anthropic:claude-2" => counters.(10, 0)
         }
       }
 
@@ -180,10 +189,13 @@ defmodule Bezalel.SettingsTest do
       view = settings() |> render_info({:rho_usage, :changed})
       t = text(view)
 
-      assert t =~ "12.9k tokens across 2 models"
+      assert t =~ "13k tokens across 3 models"
       assert t =~ "1.2k today"
-      assert t =~ "Claude Haiku 4.5 1.2k today · 12.4k"
+      assert t =~ "Claude Haiku 4.5 1.2k today · 12.5k"
       assert t =~ "Gemini 3.5 Flash 0 today · 500"
+      assert t =~ "anthropic:claude-2 0 today · 10"
+      [_, usage] = String.split(t, "TOKEN USAGE")
+      refute usage =~ "Sonnet"
       assert_renderable(view)
     end
   end

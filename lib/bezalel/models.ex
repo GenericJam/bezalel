@@ -84,6 +84,36 @@ defmodule Bezalel.Models do
   end
 
   @doc """
+  The catalog's model for a spec rho recorded usage under, matching an
+  alias or a dated snapshot too (`claude-haiku-4-5` is
+  `claude-haiku-4-5-20251001`); nil when the catalog doesn't have it (a
+  model since retired, a provider rho doesn't list).
+  """
+  @spec lookup(String.t()) :: model() | nil
+  def lookup(id) do
+    case Auth.provider_for_model(id) do
+      {:ok, provider} ->
+        canonical = canonical(id)
+        Enum.find(catalog(provider), &(&1.id == canonical or Rho.Models.same?(&1.id, id)))
+
+      :error ->
+        nil
+    end
+  end
+
+  # The spec of the model llm_db resolves `id` (an alias, say) to.
+  defp canonical(id) do
+    case LLMDB.model(id) do
+      {:ok, %{provider: provider, id: model_id}} -> "#{provider}:#{model_id}"
+      _ -> id
+    end
+  end
+
+  @doc "A provider's dot color."
+  @spec dot(Auth.provider() | nil) :: integer() | nil
+  def dot(provider), do: @dots[provider]
+
+  @doc """
   Who a message or tool is attributed to: the model's name, or "Scripted
   reply" for the design's storyboard.
   """

@@ -71,6 +71,8 @@ defmodule Bezalel.Account do
   @doc """
   Tokens per model (input, output and cache), today and in total, the
   biggest total first: `[%{model, today, total}]`. Empty before any call.
+  Calls recorded under an alias or a dated snapshot of one catalog model
+  count as that model (`model` is then its catalog id).
   """
   @spec usage(Date.t()) :: [
           %{model: String.t(), today: non_neg_integer(), total: non_neg_integer()}
@@ -81,8 +83,16 @@ defmodule Bezalel.Account do
 
     state
     |> Rho.Usage.by_model(:total)
-    |> Enum.map(fn {model, counters} ->
-      %{model: model, today: tokens(day[model]), total: tokens(counters)}
+    |> Enum.group_by(
+      fn {spec, _} -> spec |> Bezalel.Models.lookup() |> then(&((&1 && &1.id) || spec)) end,
+      fn {spec, counters} -> {tokens(day[spec]), tokens(counters)} end
+    )
+    |> Enum.map(fn {model, figures} ->
+      %{
+        model: model,
+        today: figures |> Enum.map(&elem(&1, 0)) |> Enum.sum(),
+        total: figures |> Enum.map(&elem(&1, 1)) |> Enum.sum()
+      }
     end)
     |> Enum.sort_by(&{-&1.total, &1.model})
   end
