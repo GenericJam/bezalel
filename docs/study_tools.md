@@ -69,6 +69,8 @@ neighbours.
   hermeneutics.py's shorter one, so more abbreviations get a genre line.
 - A `limit` of zero, a negative number or text is the default (theirs passed it to SQL,
   where -1 meant no limit); string arguments are trimmed.
+- References take ASCII digits only ("Ps 22:18", not other scripts' numerals), where
+  their `\d` patterns accepted any Unicode digit.
 - Descriptions drop references to tools Bezalel doesn't have yet (`explore_genealogy`,
   `explore_person_events`, `explore_place`, `graph_enriched_search`, `get_study_notes`,
   `get_ane_context`); `parse_morphology` describes the Hebrew codes the packs use
