@@ -7,7 +7,8 @@ Bezalel's study tools (lib/bezalel/study/) are an Elixir port of its query
 layer, tool handlers and output formats (src/study_bible_mcp/database.py,
 tools.py, server.py), its tool descriptions, its hermeneutics guidance
 (hermeneutics.py) and its system prompt (prompts/system_prompt.md), adapted;
-data/scripts/make_fixtures.py mirrors its lexicon search. Its licence:
+data/scripts/make_fixtures.py mirrors its lexicon search, and
+priv/study/research_sources.json is its research-sources catalogue. Its licence:
 
   MIT License
 
