@@ -77,6 +77,11 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   sample). Models: `Bezalel.Models` (rho's catalog for the providers the
   user has access to; a model id is its req_llm spec). Sign-ins, API keys
   and token usage: `Bezalel.Account`, over rho.
+- **Study tools** (`Bezalel.Study.*`): studybible-mcp's tools ported to
+  Elixir as rho tool modules over the study packs (`data/`), with the
+  system prompt (`Bezalel.Study.Prompt`). Not wired to the agent yet. How
+  they were ported, the pack access, the fixtures and the differences from
+  studybible-mcp: `docs/study_tools.md`.
 - **rho** (`../rho`, a path dep until it's on Hex) is the agent core:
   `Rho.Supervisor` starts in `Bezalel.App.on_start`, configured in
   `config/config.exs` (`config :rho`: data dir from `Mob.data_dir/0`, the

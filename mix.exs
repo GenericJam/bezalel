@@ -33,6 +33,8 @@ defmodule Bezalel.MixProject do
       # The design plugin (style package): Bezalel's themes, palette, fonts.
       {:mob_bezalel, path: "../mob_bezalel"},
       {:ecto_sqlite3, "~> 0.18"},
+      # The study packs are read with Exqlite directly (Bezalel.Study.DB).
+      {:exqlite, "~> 0.42"},
       # The agent core: models, sign-in, usage. A path dep while rho and
       # Bezalel move together; it moves to Hex once rho is published.
       {:rho, path: "../rho"},
