@@ -98,9 +98,10 @@ library's tests pass in CI, and it is published.
   tools, downscaled to the display size, tap to view full size.
 - Settings: sign-in (Anthropic, Codex), API keys (Anthropic, OpenAI, Gemini),
   models from the library's registry, real usage.
-- First launch: download the core pack with progress (Android needs
-  mob_background for a download that outlives the screen); Settings shows
-  pack versions and "Check for updates".
+- First launch: offer the core pack download with progress; Settings shows
+  pack versions and "Check for updates". Done without mob_background: a
+  download runs while the app process lives and resumes from its part file
+  on the next launch.
 
 ## Phase 5: store review
 

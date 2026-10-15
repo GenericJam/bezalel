@@ -27,7 +27,8 @@ study packs ([data/README.md](../data/README.md)).
 `Bezalel.Study.DB.with_pack/2` opens the one pack a call needs, read-only, with Exqlite
 directly, and closes it when the call ends. The directory is `config :bezalel,
 :study_packs_dir` when set (tests: `test/fixtures/packs`; the smoke script: `data/out`),
-else `Mob.data_dir()/packs`, where the app will download them.
+else `Mob.data_dir()/packs`, where `Bezalel.Packs` downloads them (verified, swapped in
+whole; see data/README.md).
 
 Why not a second Ecto repo with the packs `ATTACH`ed: rho runs a reply's tool calls in
 parallel, and a connection per call shares nothing between them, while a pool would hold
