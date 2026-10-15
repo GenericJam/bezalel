@@ -43,4 +43,19 @@ defmodule Bezalel.Study.ToolsTest do
     {:ok, text} = Tools.LookupVerse.run(%{"reference" => "Exodus 31:2-3"}, %{})
     assert tools_named(text) -- @names == []
   end
+
+  test "a number too big for SQLite is refused as an argument, not a crash" do
+    huge = 99_999_999_999_999_999_999_999
+
+    for {tool, args} <- [
+          {Tools.GetCrossReferences, %{"reference" => "Exodus 31:3", "limit" => huge}},
+          {Tools.GetCrossReferences, %{"reference" => "Exodus 31:3", "min_strength" => huge}},
+          {Tools.SearchLexicon, %{"query" => "wisdom", "limit" => Integer.to_string(huge)}},
+          {Tools.SearchByStrongs, %{"strongs" => "H2451", "limit" => huge}},
+          {Tools.FindSimilarPassages, %{"reference" => "Psalm 22:18", "limit" => huge}}
+        ] do
+      assert {status, text} = tool.run(args, %{}), inspect({tool, args})
+      assert status in [:ok, :error] and is_binary(text)
+    end
+  end
 end

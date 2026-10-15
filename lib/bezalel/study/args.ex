@@ -47,18 +47,25 @@ defmodule Bezalel.Study.Args do
 
   @doc """
   An integer argument (an integer, a whole float or a numeric string):
-  `{:ok, n}`, `{:ok, default}` when absent or null, `:error` otherwise.
+  `{:ok, n}`, `{:ok, default}` when absent or null, `:error` otherwise,
+  including a number outside SQLite's 64-bit range (it can't be bound).
   """
   @spec integer(map(), String.t(), integer() | nil) :: {:ok, integer() | nil} | :error
   def integer(args, key, default) do
     case Map.get(args, key) do
       nil -> {:ok, default}
-      n when is_integer(n) -> {:ok, n}
-      n when is_float(n) and n == trunc(n) -> {:ok, trunc(n)}
-      n when is_binary(n) -> parse(n)
+      n when is_integer(n) -> in_range(n)
+      n when is_float(n) and n == trunc(n) -> in_range(trunc(n))
+      n when is_binary(n) -> with {:ok, n} <- parse(n), do: in_range(n)
       _ -> :error
     end
   end
+
+  @int64_min -0x8000000000000000
+  @int64_max 0x7FFFFFFFFFFFFFFF
+
+  defp in_range(n) when n >= @int64_min and n <= @int64_max, do: {:ok, n}
+  defp in_range(_n), do: :error
 
   defp parse(text) do
     case Integer.parse(String.trim(text)) do

@@ -42,10 +42,15 @@ defmodule Bezalel.Study.Patterns do
     genre_name: {~S"^(\d?\s*[a-zA-Z]+)\s*\d+:\d+", "u"}
   }
 
+  # The cache key carries a hash of the sources, so a hot-loaded version of
+  # this module with a changed pattern compiles it afresh instead of reading
+  # the old one out of :persistent_term.
+  @version :erlang.phash2(@sources)
+
   @doc "The compiled pattern `name`."
   @spec get(atom()) :: Regex.t()
   def get(name) do
-    key = {__MODULE__, name}
+    key = {__MODULE__, @version, name}
 
     case :persistent_term.get(key, nil) do
       nil ->
