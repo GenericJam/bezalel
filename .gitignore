@@ -53,3 +53,6 @@ xcuserdata/
 /data/.venv/
 /data/scripts/__pycache__/
 .wrangler
+
+# ExUnit @tmp_dir output
+/tmp/

@@ -10,14 +10,13 @@ defmodule Bezalel.Study.Tools do
   (`{:ok, {:details, markdown, result}}`), which the live agent turns into
   the passage card (`Bezalel.Agent.Card`).
 
-  `all/0` is every tool, the set the live agent offers. `tier1/0` is the
-  first set: text, lexicon, morphology, names, cross references and similar
-  passages (the core pack) and the people in a passage (the graph pack).
-  The rest read the graph (genealogies, events, places), notes (study
-  notes, dictionary, key terms, ANE and theology context, textual
-  variants), lxx (the Septuagint beside the Hebrew) and ancient (Second
-  Temple sources) packs, the Torah weave in core, and a list of research
-  sources shipped with the app.
+  `all/0` is every tool, the set the live agent offers: text, lexicon,
+  morphology, names, cross references, similar passages and the Torah
+  weave (the core pack); people, genealogies, events and places (graph);
+  study notes, dictionary, key terms, ANE and theology context and
+  textual variants (notes); the Septuagint beside the Hebrew (lxx);
+  Second Temple sources (ancient); and a list of research sources shipped
+  with the app.
   """
 
   alias Bezalel.Study.Tools
@@ -56,8 +55,4 @@ defmodule Bezalel.Study.Tools do
   @doc "Every study tool module."
   @spec all() :: [module()]
   def all, do: @tier1 ++ @tier2
-
-  @doc "The tier 1 tool modules."
-  @spec tier1() :: [module()]
-  def tier1, do: @tier1
 end
