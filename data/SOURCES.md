@@ -1,15 +1,18 @@
 # Study database: sources and licences
 
 The licence audit for Bezalel's study database (bead `bezalel-e47.1`). Bezalel is
-free and non-commercial: no price, no ads, no in-app purchases. On that basis
-public domain, CC BY, CC BY-SA and CC BY-NC material is **in**; material still in
-copyright without a grant is **out**. Audited at studybible-mcp
+free and non-commercial: no price, no ads, no in-app purchases, ever. On that
+basis public domain, CC BY, CC BY-SA and CC BY-NC material is **in**. Material
+still in copyright without a grant is **out**, with one exception decided by the
+maintainer (Kevin, 2026-10-15): studybible-mcp's summaries of in-copyright
+theological scholarship are **in**, while full texts of in-copyright works stay
+out (section "Included by the maintainer's decision"). Audited at studybible-mcp
 `38cef28dc2d7c1e834cbd5248edc0f65843e7819` (2026-10-14); every source below is
 pinned in `pins.json` or by that commit's own download scripts.
 
 The packs are built by `data/build.sh` (see `README.md`); `exclusions.json` lists
-what is removed before the build, and `scripts/check_packs.py` checks that none of
-it shipped.
+the files deleted before the build, and `scripts/check_packs.py` checks that none
+of them shipped.
 
 ## In
 
@@ -32,10 +35,9 @@ it shipped.
 | unfoldingWord Translation Notes | `aquifer_content` (`translation_notes_uw`) → notes | github.com/BibleAquifer/UWTranslationNotes @ `dbfb46e0` | CC BY-SA 4.0 |
 | SIL Open Translator's Notes | `aquifer_content` (`translation_notes_sil`) → notes | github.com/BibleAquifer/SILOpenTranslatorsNotes @ `0ba58c29` | CC BY-SA 4.0 |
 | FIA Key Terms (Word Collective) | `aquifer_content` (`key_terms`) → notes | github.com/BibleAquifer/FIAKeyTerms @ `91e4a774` | CC BY-SA 4.0 |
-| ANE context entries (studybible-mcp, original summary prose naming standard reference works; Heiser is cited as one source among several in 11 of them) | `ane_entries`, `ane_book_mappings` → notes (102 of 120 entries, with `relig_008` and `cosmo_013` restored to their text before the *Lamb of the Free* additions; see Out) | `data/ane_context/` in studybible-mcp | MIT |
-| John Owen (d. 1683), summaries written for studybible-mcp, linking CCEL texts | `theology_*` → notes (45 entries) | `data/owen/`, `data/reformed_evangelical/themes.json` | Owen's works: public domain; summaries: MIT |
-| Theme taxonomy (studybible-mcp) | `theology_themes` → notes: the 17 themes, of 41 in `data/reformed_evangelical/themes.json`, that kept Owen entries use (or are parents of), two of them redefined (next row), with key works naming excluded authors dropped | `data/reformed_evangelical/themes.json` (trimmed by `scripts/prune.py`) | MIT |
-| Five theme definitions written for Bezalel | `theology_themes` → notes: `atonement_models`, `image_of_god`, `corporate_headship` (used by Owen entries; their only definitions were in the excluded synthesis, Heiser and Bradley folders) and `penal_substitution`, `holy_spirit_work` (upstream text described Stott's arguments) | `added_themes.json` | Bezalel's own text |
+| ANE context entries (studybible-mcp, original summary prose naming standard reference works) | `ane_entries`, `ane_book_mappings` → notes (all 120 entries; the 18 drawn from *Lamb of the Free* are listed under the maintainer's decision) | `data/ane_context/` in studybible-mcp | MIT |
+| John Owen (d. 1683), summaries written for studybible-mcp, linking CCEL texts | `theology_*` → notes (45 entries) | `data/owen/` | Owen's works: public domain; summaries: MIT |
+| Theme taxonomies (studybible-mcp) | `theology_themes` → notes | `data/heiser/themes.json`, `data/bradley/themes.json`, `data/synthesis/themes.json`, `data/reformed_evangelical/themes.json` | MIT |
 | Rahlfs Septuagint (1935) morphology, OpenScriptorium lxx-morph (Seth Kushniryk, from Eliran Wong's digital edition), with its `verse_pairs.jsonl` mapping derived in part from STEPBible TVTMS | LXX text and morphology (`biblical_version_verses` → lxx) | github.com/OpenScriptorium/lxx-morph @ `c91f6b1e` (blob hashes pinned in studybible-mcp) | Morphology and mapping: CC BY 4.0; Rahlfs text: public domain |
 | Brenton, *The Septuagint with Apocrypha* (1851), English and Greek, from eBible.org | `biblical_version_verses` → lxx | ebible.org eng-Brenton, grcbrent (sha256 per book pinned in studybible-mcp) | Public domain |
 | Josephus, Perseus canonical-greekLit (Niese Greek, Whiston English, TEI) | `ancient_source_*` → ancient | github.com/PerseusDL/canonical-greekLit @ `01b725d8` | CC BY-SA 4.0 |
@@ -53,18 +55,30 @@ The `ancient_source_passages` rows carry their own `edition`, `license`,
 `original_license`, `translation_license` and source URL, so the app can show the
 right credit beside each passage.
 
+## Included by the maintainer's decision
+
+No licence grant. These are studybible-mcp's own summaries (MIT as code and prose),
+written from the authors' published books, papers and podcasts; they describe the
+authors' arguments, sometimes quoting a sentence. Kevin decided on 2026-10-15 to
+include them. The full texts they were written from are not included (see Out,
+and the full-text check in `check_packs.py`).
+
+| Author and works | Supplies (table → pack) | Where from |
+|---|---|---|
+| Michael S. Heiser: summaries of 17 papers, dictionary articles and Naked Bible Podcast episodes (e.g. "Deuteronomy 32:8 and the Sons of God", *Bibliotheca Sacra* 158, 2001; "Monotheism, Polytheism, Monolatry, or Henotheism?", *BBR* 18.1, 2008; *Faithlife Study Bible* and *Lexham Bible Dictionary* articles; ETS 2010 and SBL 2012 papers on Psalm 82), with links to the copies he posted; his theme taxonomy | `theology_content`, `theology_verse_index`, `theology_themes`, `theology_theme_index` → notes (46 entries) | `data/heiser/content/*.json`, `data/heiser/themes.json` |
+| Michael S. Heiser: the textual-variant dataset: 30 MT/LXX/DSS cases with readings, witnesses and dates, an unsourced consensus summary, his analysis, and his "Heiser Literal Translation" decisions; 22 NT→OT LXX-form quotation hints | `textual_variant_*`, `textual_*`, `nt_ot_lxx_quote_hints` → notes (used by `get_textual_variant` and `lookup_verse`'s cues) | `data/heiser/variants/*.json`, `data/heiser/lxx_quote_hints.json` |
+| John Stott: summaries of *The Cross of Christ*, *Basic Christianity*, and *The Message of* Romans, Galatians, Ephesians, Acts (with *Baptism and Fullness*) and the Sermon on the Mount (Bible Speaks Today) | `theology_*` → notes (62 entries) | `data/stott/content/*.json`, `data/reformed_evangelical/themes.json` |
+| John Lennox: summaries of *Seven Days That Divide the World*, *Against the Flow* (Daniel), *Joseph* and *Determined to Believe?* | `theology_*` → notes (23 entries) | `data/lennox/content/*.json` |
+| Bradley: summary of the paper "Two Fathers Only: Rival Pater Familias and the Organizing Binary of Scripture" | `theology_*` → notes (12 entries) | `data/bradley/` |
+| Andrew Remington Rillera, *Lamb of the Free* (Cascade, 2024), building on Jacob Milgrom: 18 ANE entries (`relig_012`–`relig_021`, `legal_009`, `death_008`, `gender_008`, `cosmo_015`, `method_005`–`method_008`) and additions to `relig_008` and `cosmo_013` | `ane_entries`, `ane_book_mappings` → notes | `data/ane_context/` (from `ingest_lamb_of_free.py`, `ingest_atonement_synthesis.py`) |
+| Atonement synthesis (studybible-mcp), drawing on Bradley and Rillera | `theology_*` → notes (2 entries) | `data/synthesis/` |
+
 ## Out
 
 | Source | What it is | Why out |
 |---|---|---|
-| `data/heiser/` (Michael S. Heiser) | Full copies of in-copyright papers and Naked Bible podcast transcripts (`content/*.txt`; `monotheism_divine_plurality.txt` carries "Copyright 2008 The Institute for Biblical Research. All rights reserved."), entries summarising them section by section with page ranges, a catalogue of his books, and the textual-variant cases and LXX quotation hints whose records embed his analysis and his "Heiser Literal Translation" choices | In copyright, no grant. Tables left empty: `theology_*` rows by Heiser, `textual_variant_*`, `textual_*`, `nt_ot_lxx_quote_hints` |
-| `data/stott/` (John Stott, d. 2011) | Chapter-by-chapter summaries of *The Cross of Christ*, *Basic Christianity*, and five Bible Speaks Today volumes | In copyright, no grant (Kevin's rule in PLAN.md) |
-| `data/lennox/` (John Lennox) | Summaries of *Seven Days That Divide the World*, his Daniel and Joseph books | In copyright, no grant |
-| 24 of the 41 themes in `data/reformed_evangelical/themes.json` | Topic definitions used only by the Stott and Lennox entries (e.g. `creation_genesis`, "Lennox's science-and-Scripture approach"; `deity_of_christ`, from *Basic Christianity*) | They describe the excluded books; trimmed by `scripts/prune.py` so the taxonomy holds only themes kept entries use |
-| `data/bradley/` | Section-by-section summary of the paper "Two Fathers Only" (no public copy) | In copyright, no grant |
-| Burnett, "So Shall Your Seed Be" (JSPL 5.2, 2015), and the Bradley/Gage John–Revelation spreadsheet | `ingest_burnett_gage.py` reads `data/Burnett-JSPL5.2.pdf` and `data/bradley_gage_john_rev.xlsx`, which are not in the repository | In copyright; not obtainable from the pin. Not run |
-| 18 ANE entries from *Lamb of the Free* (Andrew Rillera, Cascade 2024), and that book's additions to two kept entries | `relig_012`–`relig_021`, `legal_009`, `death_008`, `gender_008`, `cosmo_015`, `method_005`–`method_008`, written by `ingest_lamb_of_free.py` and `ingest_atonement_synthesis.py` as summaries of that book; the same script appended parallels and notes to `relig_008` and `cosmo_013` | Same standard as Stott: summaries of one in-copyright work. Entries removed and the two kept ones restored to their earlier text by `exclusions.json` |
-| `data/synthesis/` (atonement synthesis note and theme) | Two entries and a theme arguing a representation reading of the atonement, built on Bradley's paper and *Lamb of the Free* and pointing readers to the excluded ANE entries | Depends on excluded material; `ingest_atonement_synthesis.py` is not run |
+| Full texts in `data/heiser/content/*.txt` | 26 files: Heiser's papers and Naked Bible Podcast transcripts in full (`monotheism_divine_plurality.txt` carries "Copyright 2008 The Institute for Biblical Research. All rights reserved.") | In copyright, no grant. studybible-mcp's importer reads only the `*.json` summaries; `scripts/prune.py` deletes the `.txt` files before the build anyway, and `check_packs.py` checks that no more than 20% of any of them appears in the notes pack (the summaries quote at most 8%) |
+| Burnett, "So Shall Your Seed Be" (JSPL 5.2, 2015), and the Bradley/Gage John–Revelation spreadsheet | `ingest_burnett_gage.py` reads `data/Burnett-JSPL5.2.pdf` and `data/bradley_gage_john_rev.xlsx` | Absent from the repository at the pin, so they can't be built; the hosted database's 3 Burnett entries and 2,088 `gage`/`burnett` cross references are not in our packs |
 | Harrison–Römhild cross references (`CH-CrossReference.xlsx`) | 57,614 `cross_references` rows (`type = 'ch'`) in the hosted database | No licence stated; the file is "requested from Robert Rouse / Viz.Bible", not published. Not obtainable from the pin |
 | OpenAI embeddings (`verse_vectors`, `passage_vectors`) | `text-embedding-3-small` vectors of the STEPBible gloss text in the hosted database | Not licence-blocked, but not reproducible (an OpenAI key, a paid API, non-deterministic output, and the vectors in the hosted file can't be pinned). Replaced by `similar_verses`/`similar_passages`, computed here |
 
@@ -92,8 +106,8 @@ CC-licensed item:
 > Bible references, indexed for search, and split into downloadable packs. Their
 > wording is otherwise unchanged.
 
-(The repository has no public remote yet; when it or the pack host publishes
-`data/README.md`, link the notice to it.)
+The notice links to how the database is built:
+https://github.com/GenericJam/bezalel/blob/master/data/README.md
 
 Each string below also ends with "Modified." where the source is CC-licensed.
 Strings to use verbatim:
@@ -169,17 +183,40 @@ Strings to use verbatim:
 22. **4 Ezra** — "4 Ezra (2 Esdras 3–14): King James Version, from eBible.org;
     Latin: Clementine Vulgate from Latin Wikisource, CC BY-SA 4.0. Modified."
     Link: https://la.wikisource.org
-23. **studybible-mcp** — "Study tools, ANE context, theology summaries and
-    editorial notes adapted from studybible-mcp, Copyright (c) 2024 Study Bible MCP
-    Contributors, MIT License." The MIT notice must accompany copies of substantial
-    portions: include the full MIT licence text from the studybible-mcp
-    `LICENSE` file on the attributions screen.
+23. **studybible-mcp** — "Study tools, ANE context, theology summaries, textual
+    variants and editorial notes adapted from studybible-mcp, Copyright (c) 2024
+    Study Bible MCP Contributors, MIT License." The MIT notice must accompany
+    copies of substantial portions: include the full MIT licence text from the
+    studybible-mcp `LICENSE` file on the attributions screen.
+
+Under a heading such as "Summaries of scholarship", the screen also credits the
+authors whose work studybible-mcp summarises (no licence applies; these are
+credits, and the summaries are studybible-mcp's own words):
+
+24. **Michael S. Heiser** — "Summaries of, and textual-variant analysis from, the
+    published work of Michael S. Heiser, including 'Deuteronomy 32:8 and the Sons
+    of God' (Bibliotheca Sacra, 2001), 'Monotheism, Polytheism, Monolatry, or
+    Henotheism?' (Bulletin for Biblical Research, 2008), his articles in the
+    Faithlife Study Bible and the Lexham Bible Dictionary, and the Naked Bible
+    Podcast." Link: https://drmsh.com
+25. **John Stott** — "Summaries of John Stott's The Cross of Christ, Basic
+    Christianity, and The Message of Romans, Galatians, Ephesians, Acts and the
+    Sermon on the Mount (The Bible Speaks Today), and Baptism and Fullness."
+26. **John Lennox** — "Summaries of John Lennox's Seven Days That Divide the World,
+    Against the Flow, Joseph, and Determined to Believe?"
+27. **Bradley** — "Summary of Bradley, 'Two Fathers Only: Rival Pater Familias and
+    the Organizing Binary of Scripture'."
+28. **Andrew Remington Rillera** — "Ancient Near East context entries summarising
+    Andrew Remington Rillera, Lamb of the Free (Cascade Books, 2024), and the work
+    of Jacob Milgrom on which it builds."
+29. **John Owen** — "Summaries of John Owen's works (public domain), linking the
+    texts at the Christian Classics Ethereal Library." Link: https://ccel.org/ccel/owen
 
 ## Obligations that follow
 
 - **Non-commercial (CC BY-NC):** the Dead Sea Scrolls and the Metsudah English are
-  in the ancient pack. If Bezalel ever charges, shows ads or sells anything, those
-  two must come out of the ancient pack first.
+  in the ancient pack. Bezalel is free with no ads (Decisions, 3); if that ever
+  changed, those two would have to come out of the ancient pack first.
 - **ShareAlike (CC BY-SA):** our adapted versions (the pack tables holding ACAI,
   Aquifer, Theographic, Josephus, Philo and the Latin 4 Ezra) must be offered under
   CC BY-SA 4.0. Each pack file is a collection of separately licensed tables and
@@ -191,20 +228,19 @@ Strings to use verbatim:
   except the UK, where the Crown's letters patent apply. It reaches the packs only
   as the English of 4 Ezra (2 Esdras 3–14). Low risk; noted for completeness.
 
-## Questions for Kevin
+## Decisions
 
-1. **Summaries of in-copyright works.** studybible-mcp says its Heiser, Stott,
-   Lennox, Bradley and Burnett entries are "original summary prose", not reproduced
-   text. Summarising ideas is generally lawful, but these follow single books
-   chapter by chapter (Heiser's with page ranges and the source texts sitting
-   beside them), so under your rule they are out; so, for consistency, are the 18
-   *Lamb of the Free* ANE entries, that book's additions to two kept entries, and
-   the atonement synthesis built on Bradley and Rillera. Kept: the Owen summaries
-   (public-domain works) and the ANE entries, which summarise scholarly consensus
-   and cite Heiser or Walton among other sources. Confirm, or name any author to
-   bring back (Lennox and Stott could also be asked for permission).
-2. **Textual variants without Heiser.** `get_textual_variant` (30 MT/LXX/DSS cases)
-   has no data because its dataset lives in `data/heiser/variants` and embeds
-   Heiser's analysis and his translation choices. The manuscript evidence itself
-   (readings, witnesses, dates) is factual; the cases could be rebuilt without the
-   `heiser_analysis` and HLT fields if you want the tool.
+Taken by Kevin on 2026-10-15, on the questions this audit raised:
+
+1. **Summaries of in-copyright scholarship are in**: Heiser, Stott, Lennox,
+   Bradley, Rillera (*Lamb of the Free*) and the atonement synthesis, run through
+   studybible-mcp's own importers. Full texts stay out (Heiser's `.txt` papers and
+   transcripts), as do Burnett and the Bradley/Gage spreadsheet, which the
+   repository doesn't contain.
+2. **`get_textual_variant`** uses Heiser's variant dataset as studybible-mcp builds
+   it.
+3. **CC BY-NC material stays**: Bezalel is free, with no ads, ever.
+4. **Links**: the repository is public as GenericJam/bezalel; the attributions
+   screen links the modification notice to
+   https://github.com/GenericJam/bezalel/blob/master/data/README.md and this file
+   to https://github.com/GenericJam/bezalel/blob/master/data/SOURCES.md.

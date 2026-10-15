@@ -1,28 +1,9 @@
 {
-  "_comment": "Material removed from the studybible-mcp checkout before its build scripts run (scripts/prune.py). Reasons in SOURCES.md.",
-  "data_dirs": {
-    "heiser": "Michael S. Heiser: copies of in-copyright papers and podcast transcripts, entries summarising them with page ranges, and the textual-variant cases built on his arguments.",
-    "stott": "John Stott (d. 2011): chapter-by-chapter summaries of in-copyright books.",
-    "lennox": "John Lennox: summaries of in-copyright books.",
-    "bradley": "Bradley, 'Two Fathers Only': summaries of an unpublished in-copyright paper.",
-    "synthesis": "Atonement synthesis note: an argument built on the excluded Bradley paper and Rillera's Lamb of the Free, pointing readers to the excluded ANE entries."
+  "_comment": "Files deleted from the studybible-mcp checkout before its build scripts run (scripts/prune.py). Reasons in SOURCES.md.",
+  "delete_globs": {
+    "data/heiser/content/*.txt": "Full texts of Michael S. Heiser's papers and Naked Bible Podcast transcripts (in copyright). The importer reads only the *.json summaries; the full texts are deleted so they can never ship."
   },
-  "ane_entry_ids": {
-    "_reason": "Added by scripts/ingest_lamb_of_free.py and scripts/ingest_atonement_synthesis.py: summaries of Andrew Rillera, Lamb of the Free (Cascade, 2024), in copyright.",
-    "02_religious_practices.json": ["relig_012", "relig_013", "relig_014", "relig_015", "relig_016", "relig_017", "relig_018", "relig_019", "relig_020", "relig_021"],
-    "04_legal_covenant.json": ["legal_009"],
-    "10_death_afterlife.json": ["death_008"],
-    "11_gender_family.json": ["gender_008"],
-    "01_cosmology_worldview.json": ["cosmo_015"],
-    "13_methodology.json": ["method_005", "method_006", "method_007", "method_008"]
-  },
-  "ane_entry_restore": {
-    "_reason": "ingest_lamb_of_free.py also appended Lamb of the Free material to two kept entries (studybible-mcp commit ab08d12d); they are restored to their text at that commit's parent.",
-    "commit": "b8f128f8a16f19c4d6690c78c8f3ae54eb69f092",
-    "entries": {
-      "02_religious_practices.json": ["relig_008"],
-      "01_cosmology_worldview.json": ["cosmo_013"]
-    }
-  },
-  "excluded_authors": ["Heiser", "Stott", "Lennox", "Bradley", "Burnett", "Rillera"]
+  "full_text_threshold": 0.2,
+  "authors": ["heiser", "stott", "lennox", "bradley", "owen", "synthesis"],
+  "absent_authors": ["burnett"]
 }

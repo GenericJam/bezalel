@@ -55,9 +55,9 @@ their scripts/download_ancient_sources.py --data-dir "$CACHE/ancient_sources"
 step "Sources pinned here; staging into the checkout"
 their "$HERE/scripts/sources.py" --pins "$PINS" --work "$WORK" --checkout "$CHECKOUT"
 
-step "Removing audited-out material (exclusions.json)"
-their "$HERE/scripts/prune.py" --exclusions "$HERE/exclusions.json" \
-  --added-themes "$HERE/added_themes.json" --checkout "$CHECKOUT"
+step "Removing audited-out files (exclusions.json)"
+their "$HERE/scripts/prune.py" --exclusions "$HERE/exclusions.json" --checkout "$CHECKOUT" \
+  --fingerprints "$WORK/excluded_fingerprints.json"
 
 step "studybible-mcp build"
 their scripts/build_database.py --rebuild --data-dir data --db-path db/study_bible.db
@@ -65,7 +65,13 @@ their scripts/import_theographic.py --db-path db/study_bible.db \
   --data-dir "$WORK/git/theographic/CSV" --skip-download
 their scripts/import_cross_references.py
 their scripts/import_torah_weave.py
-their scripts/ingest_reformed_evangelical.py db/study_bible.db  # Owen only: Stott, Lennox pruned
+# Theological scholarship, as studybible-mcp's README applies it (ingest_burnett_gage.py
+# needs files the repository doesn't have; see SOURCES.md).
+their scripts/import_heiser_content.py db/study_bible.db
+their scripts/import_bradley_content.py db/study_bible.db
+their scripts/ingest_atonement_synthesis.py  # defines atonement_models, a parent theme of the next
+their scripts/ingest_reformed_evangelical.py db/study_bible.db
+their scripts/ingest_lamb_of_free.py
 
 step "Similar verses and passages"
 their "$HERE/scripts/embed_input.py" --checkout "$CHECKOUT" --db "$DB" --out "$WORK/verse_texts.tsv"
@@ -75,4 +81,5 @@ step "Packs"
 ours "$HERE/scripts/make_packs.py" --db "$DB" --packs "$HERE/packs.json" --pins "$PINS" --out "$OUT"
 
 step "Checks"
-ours "$HERE/scripts/check_packs.py" --packs "$HERE/packs.json" --exclusions "$HERE/exclusions.json" --out "$OUT"
+ours "$HERE/scripts/check_packs.py" --packs "$HERE/packs.json" --exclusions "$HERE/exclusions.json" \
+  --fingerprints "$WORK/excluded_fingerprints.json" --out "$OUT"

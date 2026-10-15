@@ -1,7 +1,9 @@
 """Sanity-check the built packs: row counts, known lookups, the similar-passages
-tables, ATTACH of every pack together, and that no audited-out material shipped.
+tables, ATTACH of every pack together, the theological scholarship and textual
+variants, and that the deleted full texts did not ship.
 
-  python check_packs.py --packs packs.json --exclusions exclusions.json --out OUT
+  python check_packs.py --packs packs.json --exclusions exclusions.json \
+      --fingerprints FINGERPRINTS.json --out OUT
 
 Prints one line per check and exits non-zero if any fails.
 """
@@ -23,8 +25,8 @@ MIN_ROWS = {
     "cross_references": 300_000, "thematic_references": 20,
     "torah_weave_units": 80, "torah_weave_cells": 900,
     "similar_verses": 600_000, "similar_passages": 600_000,
-    "aquifer_content": 90_000, "ane_entries": 90, "ane_book_mappings": 300,
-    "theology_content": 40, "theology_verse_index": 100, "theology_themes": 20,
+    "aquifer_content": 90_000, "ane_entries": 115, "ane_book_mappings": 400,
+    "theology_content": 180, "theology_verse_index": 1000, "theology_themes": 60,
     "biblical_version_verses": 25_000,
     "ancient_source_passages": 20_000, "ancient_source_passages_fts": 20_000,
     "ancient_source_biblical_links": 5_000,
@@ -54,6 +56,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--packs", type=Path, required=True)
     parser.add_argument("--exclusions", type=Path, required=True)
+    parser.add_argument("--fingerprints", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -163,49 +166,61 @@ def main() -> None:
     check("graph: people in Exodus 31",
           one("SELECT COUNT(*) FROM graph_verse_mentions WHERE verse_ref LIKE 'Exod.31.%' OR verse_ref LIKE 'Exo.31.%'")[0] > 0)
 
-    # Nothing audited out shipped.
+    # Theological scholarship: the authors included by decision are present, Burnett
+    # (whose sources the repository lacks) is not, and the theme index is whole.
     authors = {r[0] for r in db.execute("SELECT DISTINCT source_author FROM theology_content")}
-    banned = set(exclusions["data_dirs"]) | {a.lower() for a in exclusions["excluded_authors"]}
-    check("theology: no excluded authors", not (authors & banned), f"authors {sorted(authors)}")
-    names = exclusions["excluded_authors"]
-    mentions = [
-        f"{table}.{key}" for table, key, columns in (
-            ("theology_content", "id", ("title", "content_summary", "content_detail", "source_work")),
-            ("theology_themes", "theme_key", ("theme_label", "description", "key_works")))
-        for row in db.execute(f"SELECT {key}, {' || '.join(f'coalesce({c}, {chr(39)}{chr(39)})' for c in columns)} FROM {table}")
-        if any(name in row[1] for name in names)
-    ]
-    check("theology: no text about excluded authors", not mentions, str(mentions))
+    check("theology: every included author present", set(exclusions["authors"]) <= authors,
+          f"authors {sorted(authors)}")
+    check("theology: absent authors not present", not (authors & set(exclusions["absent_authors"])))
     orphans = sorted({r[0] for r in db.execute(
         "SELECT DISTINCT i.theme_key FROM theology_theme_index i "
         "LEFT JOIN theology_themes t ON t.theme_key = i.theme_key WHERE t.theme_key IS NULL")})
     check("theology: every linked theme is defined", not orphans, str(orphans))
-    unused = sorted({r[0] for r in db.execute(
-        "SELECT theme_key FROM theology_themes WHERE theme_key NOT IN "
-        "(SELECT theme_key FROM theology_theme_index) AND theme_key NOT IN "
-        "(SELECT parent_theme FROM theology_themes WHERE parent_theme IS NOT NULL)")})
-    check("theology: no themes only the excluded authors used", not unused, str(unused))
-    excluded_ids = {i for f, ids in exclusions["ane_entry_ids"].items() if not f.startswith("_") for i in ids}
-    shipped = {r[0] for r in db.execute("SELECT id FROM ane_entries")}
-    check("ane: no excluded entries", not (shipped & excluded_ids), f"{len(shipped)} entries")
-    pointer = re.compile(r"\b(" + "|".join(sorted(excluded_ids)) + r")\b")
-    dangling = [
-        f"{table}.{row[0]}" for table, key in (("ane_entries", "id"), ("theology_content", "id"),
-                                                ("theology_themes", "theme_key"))
-        for row in db.execute(f"SELECT {key}, * FROM {table}")
-        if any(pointer.search(str(value)) for value in row[1:] if value)
-    ]
-    check("notes: nothing points to an excluded ANE entry", not dangling, str(dangling))
-    lamb = one("SELECT COUNT(*) FROM ane_entries WHERE interpretive_significance LIKE '%elimination/disposal genre%' "
-               "OR interpretive_significance LIKE '%immortal-soul anthropology%'")[0]
-    check("ane: Lamb of the Free augmentations reverted (relig_008, cosmo_013)", lamb == 0)
-    check("cross_references: only the openbible.info (TSK) set",
-          {r[0] for r in db.execute("SELECT DISTINCT type FROM cross_references")} == {"tsk"})
+    check("ane: Lamb of the Free entries present (relig_012, method_008)",
+          one("SELECT COUNT(*) FROM ane_entries WHERE id IN ('relig_012', 'method_008')")[0] == 2)
+
+    # Textual variants (Heiser's dataset), as get_textual_variant reads them.
+    for table, floor in (("textual_variant_cases", 25), ("textual_variant_readings", 30),
+                         ("textual_variant_witnesses", 50), ("textual_author_claims", 10),
+                         ("textual_translation_decisions", 10), ("nt_ot_lxx_quote_hints", 15)):
+        count = one(f"SELECT COUNT(*) FROM {table}")[0]
+        check(f"textual: {table}", count >= floor, f"{count} rows (floor {floor})")
+    check("textual: Deuteronomy 32:8 case with an MT reading and witnesses",
+          one("SELECT COUNT(*) FROM textual_variant_cases c "
+              "JOIN textual_variant_readings r ON r.case_id = c.id AND r.reading_key = 'mt' "
+              "JOIN textual_variant_witnesses w ON w.case_id = c.id WHERE c.reference = 'Deu.32.8'")[0] > 0)
+    linked = one("SELECT COUNT(*) FROM nt_ot_lxx_quote_hints h LEFT JOIN textual_variant_cases c "
+                 "ON c.id = h.variant_case_id WHERE h.variant_case_id IS NOT NULL AND c.id IS NULL")[0]
+    check("textual: every quotation hint's case exists", linked == 0, f"{linked} dangling")
+
+    # The deleted full texts did not ship: no deleted file has more than the threshold
+    # of its fingerprint windows anywhere in the notes pack's text (short quotations
+    # in a summary are expected). The Aquifer table is upstream CC text, not searched.
+    text = []
+    for table, columns in (
+        (t, [c[1] for c in db.execute(f'PRAGMA notes.table_info("{t}")') if c[2] in ("TEXT", "")])
+        for t in packs["notes"]["tables"] if t != "aquifer_content"
+    ):
+        for row in db.execute(f'SELECT {", ".join(columns)} FROM notes."{table}"'):
+            text.extend(str(v) for v in row if v)
+    haystack = " " + " ".join(re.sub(r"[^\w]+", " ", t.lower()) for t in text) + " "
+    haystack = re.sub(r"\s+", " ", haystack)
+    fingerprints = json.loads(args.fingerprints.read_text())
+    coverage = {
+        name: sum(f" {w} " in haystack for w in windows) / len(windows)
+        for name, windows in fingerprints.items() if windows
+    }
+    worst = max(coverage, key=coverage.get)
+    threshold = exclusions["full_text_threshold"]
+    check(f"no deleted full text shipped ({len(coverage)} files, threshold {threshold:.0%})",
+          coverage[worst] <= threshold, f"highest {worst}: {coverage[worst]:.0%}")
     marker = "Institute for Biblical Research"
-    leaked = [t for t, c in (("theology_content", "content_summary"), ("ane_entries", "detail"),
-                             ("aquifer_content", "content_plain"))
+    leaked = [t for t, c in (("theology_content", "content_summary"), ("theology_content", "content_detail"),
+                             ("ane_entries", "detail"), ("aquifer_content", "content_plain"))
               if one(f"SELECT COUNT(*) FROM {t} WHERE {c} LIKE ?", f"%{marker}%")[0]]
     check("no 'Copyright 2008 The Institute for Biblical Research' text", not leaked, str(leaked))
+    check("cross_references: only the openbible.info (TSK) set",
+          {r[0] for r in db.execute("SELECT DISTINCT type FROM cross_references")} == {"tsk"})
 
     if failures:
         sys.exit(f"\n{len(failures)} check(s) failed")

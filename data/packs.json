@@ -2,44 +2,91 @@
   "packs": {
     "core": {
       "description": "Hebrew and Greek texts with morphology, the BSB, lexicons, Strong's, names and entities, cross references, Torah weave, similar verses and passages",
+      "required": true,
+      "licence": "CC BY 4.0 (STEPBible, OpenBible.info, Torah Weave); CC BY-SA 4.0 (ACAI); public domain (Berean Standard Bible, BDB, Abbott-Smith); MIT (studybible-mcp)",
       "tables": [
-        "verses", "bsb_verses", "passages", "lexicon", "morphology", "names", "acai_entities",
-        "cross_references", "thematic_references", "torah_weave_units", "torah_weave_cells",
-        "similar_verses", "similar_passages"
+        "verses",
+        "bsb_verses",
+        "passages",
+        "lexicon",
+        "morphology",
+        "names",
+        "acai_entities",
+        "cross_references",
+        "thematic_references",
+        "torah_weave_units",
+        "torah_weave_cells",
+        "similar_verses",
+        "similar_passages"
       ]
     },
     "notes": {
-      "description": "Study notes, Bible dictionary, translator notes, key terms, ANE context, theology summaries",
+      "description": "Study notes, Bible dictionary, translator notes, key terms, ANE context, theology summaries, textual variants",
+      "required": false,
+      "licence": "CC BY-SA 4.0 (Aquifer study notes and dictionary, unfoldingWord, SIL, FIA); MIT (studybible-mcp); summaries of in-copyright scholarship (Heiser, Stott, Lennox, Bradley, Rillera) included by the maintainer's decision",
       "tables": [
-        "aquifer_content", "ane_entries", "ane_book_mappings",
-        "theology_content", "theology_verse_index", "theology_themes", "theology_theme_index"
+        "aquifer_content",
+        "ane_entries",
+        "ane_book_mappings",
+        "theology_content",
+        "theology_verse_index",
+        "theology_themes",
+        "theology_theme_index",
+        "textual_variant_cases",
+        "textual_variant_readings",
+        "textual_variant_witnesses",
+        "textual_critical_judgments",
+        "textual_theological_interpretations",
+        "textual_author_claims",
+        "textual_translation_decisions",
+        "nt_ot_lxx_quote_hints"
       ]
     },
     "lxx": {
       "description": "Septuagint (Rahlfs with morphology, Brenton English and Greek) for MT/LXX comparison",
-      "tables": ["biblical_version_verses"]
+      "required": false,
+      "licence": "CC BY 4.0 (lxx-morph, TVTMS); public domain (Rahlfs, Brenton)",
+      "tables": [
+        "biblical_version_verses"
+      ]
     },
     "ancient": {
       "description": "Ancient sources to c. AD 200: Josephus, Targum Onkelos, Qumran, Philo, 1 Enoch, 4 Ezra, Mishnah",
+      "required": false,
+      "licence": "CC BY-SA 4.0 (Josephus, Philo, Latin 4 Ezra); CC BY-NC 4.0 (Dead Sea Scrolls, Metsudah English); CC BY 3.0 (Mishnah Yomit English); public domain; MIT (editorial notes)",
       "tables": [
-        "ancient_source_passages", "ancient_source_passages_fts",
-        "ancient_source_biblical_links", "ancient_source_notes"
+        "ancient_source_passages",
+        "ancient_source_passages_fts",
+        "ancient_source_biblical_links",
+        "ancient_source_notes"
       ]
     },
     "graph": {
       "description": "Theographic people, places, events, family and verse-mention graph",
+      "required": false,
+      "licence": "CC BY-SA 4.0 (Theographic); CC BY 4.0 (OpenBible.info geocoding); public domain (Easton)",
       "tables": [
-        "graph_people", "graph_places", "graph_events", "graph_people_groups",
-        "graph_family_edges", "graph_person_event_edges", "graph_event_place_edges",
-        "graph_person_group_edges", "graph_verse_mentions"
+        "graph_people",
+        "graph_places",
+        "graph_events",
+        "graph_people_groups",
+        "graph_family_edges",
+        "graph_person_event_edges",
+        "graph_event_place_edges",
+        "graph_person_group_edges",
+        "graph_verse_mentions"
       ]
     }
   },
   "drop_empty": [
-    "hlt_verses", "hlt_annotations", "hlt_study_notes", "nt_ot_lxx_quote_hints",
-    "textual_variant_cases", "textual_variant_readings", "textual_variant_witnesses",
-    "textual_critical_judgments", "textual_theological_interpretations",
-    "textual_author_claims", "textual_translation_decisions"
+    "hlt_verses",
+    "hlt_annotations",
+    "hlt_study_notes"
   ],
-  "drop_views": ["heiser_content", "heiser_verse_index", "heiser_themes", "heiser_theme_index"]
+  "drop_views": [
+    "heiser_content",
+    "heiser_verse_index",
+    "heiser_themes",
+    "heiser_theme_index"
+  ]
 }

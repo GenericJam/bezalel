@@ -20,7 +20,8 @@ graph     the verse mentions in those chapters and the people, places and
           events they name, with the edges among them
 notes     the study notes, dictionary and translator notes over Exodus 31 and
           John 3, the ANE entries mapped to them, all theology themes and the
-          theology content indexed to them
+          theology content indexed to them, and the textual-variant cases and
+          LXX quotation hints over all the chapters above
 lxx       the Septuagint rows of those chapters
 ancient   the ancient-source passages linked to those chapters, with their
           links, notes and search-index rows
@@ -227,6 +228,18 @@ def notes_filters(src: sqlite3.Connection) -> dict[str, str]:
         f"SELECT DISTINCT content_id FROM theology_verse_index WHERE "
         f"{chapter_clause('book', 'chapter', chapters=NOTES_CHAPTERS)}",
     )
+    # Textual variants over the fixture chapters, and the quotation hints whose
+    # quoting or quoted verse is in them (with the cases they link to).
+    hint_refs = like_any("nt_reference", [f"{c[0]}.{c[2]}.%" for c in CHAPTERS]) + " OR " + like_any(
+        "ot_reference", [f"{c[0]}.{c[2]}.%" for c in CHAPTERS]
+    )
+    cases = ids(
+        src,
+        f"SELECT id FROM textual_variant_cases WHERE {chapter_clause('book', 'chapter')} "
+        f"UNION SELECT variant_case_id FROM nt_ot_lxx_quote_hints "
+        f"WHERE variant_case_id IS NOT NULL AND ({hint_refs})",
+    )
+    by_case = f"case_id IN {in_list(cases)}"
     return {
         "aquifer_content": range_clause(
             "book_num", "chapter_start", "chapter_end", books=lambda c: c[3], chapters=NOTES_CHAPTERS
@@ -237,6 +250,14 @@ def notes_filters(src: sqlite3.Connection) -> dict[str, str]:
         "theology_verse_index": f"content_id IN {in_list(content)}",
         "theology_themes": "1",
         "theology_theme_index": f"content_id IN {in_list(content)}",
+        "textual_variant_cases": f"id IN {in_list(cases)}",
+        "textual_variant_readings": by_case,
+        "textual_variant_witnesses": by_case,
+        "textual_critical_judgments": by_case,
+        "textual_theological_interpretations": by_case,
+        "textual_author_claims": by_case,
+        "textual_translation_decisions": by_case,
+        "nt_ot_lxx_quote_hints": hint_refs,
     }
 
 

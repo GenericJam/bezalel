@@ -2,7 +2,7 @@
 
 Bezalel's study tools read a SQLite database built from
 [studybible-mcp](https://github.com/djayatillake/studybible-mcp)'s own pipeline,
-pinned to a commit, with the audited-out material removed, then split into packs
+pinned to a commit, with the audited-out files removed, then split into packs
 the app downloads separately. Licences and the attributions the app must show:
 [SOURCES.md](SOURCES.md).
 
@@ -34,26 +34,27 @@ What it does, in order:
    OpenBible.info cross references; the embedding model by revision and sha256.
    It also re-checks the cached STEPBible files against their pinned sha256 and
    stages everything into the checkout's `data/`.
-4. `scripts/prune.py` deletes the excluded material listed in
-   `exclusions.json` (author folders, 18 ANE entries), restores two ANE entries to
-   their text before the excluded additions, trims the theme taxonomy to the
-   themes kept entries use, puts in `added_themes.json`, and fails if any of it
-   has moved.
+4. `scripts/prune.py` deletes the files listed in `exclusions.json` (the full
+   texts of Heiser's papers and transcripts, `data/heiser/content/*.txt`, which
+   the importer doesn't read) after recording fingerprints of them, and fails if
+   they have moved.
 5. Runs studybible-mcp's build scripts unchanged: `build_database.py --rebuild`,
    `import_theographic.py`, `import_cross_references.py` (TSK only),
-   `import_torah_weave.py` and `ingest_reformed_evangelical.py` (Owen only, since
-   Stott and Lennox are pruned). Not run: `import_heiser_content.py`,
-   `ingest_burnett_gage.py`, `ingest_lamb_of_free.py`,
-   `ingest_atonement_synthesis.py`, `generate_embeddings.py`,
-   `upgrade_database.py` and the `repair_*` scripts (patches for their hosted
-   database).
+   `import_torah_weave.py`, then the theological scholarship as their README
+   applies it: `import_heiser_content.py` (summaries, themes, textual variants,
+   LXX quotation hints), `import_bradley_content.py`,
+   `ingest_atonement_synthesis.py`, `ingest_reformed_evangelical.py` (Owen,
+   Stott, Lennox) and `ingest_lamb_of_free.py`. Not run:
+   `ingest_burnett_gage.py` (its PDF and spreadsheet aren't in the repository),
+   `generate_embeddings.py`, `upgrade_database.py`, the one-off migrations and the
+   `repair_*` scripts (patches for their hosted database).
 6. `scripts/embed_input.py` and `scripts/similar.py` precompute similar verses
    and passages (below).
 7. `scripts/make_packs.py` splits the database by `packs.json`, writes
    `out/<pack>.sqlite`, `out/<pack>.sqlite.zst`, `out/sizes.tsv` and
    `out/tables.tsv`.
-8. `scripts/check_packs.py` sanity-checks the packs; the build fails if any check
-   fails.
+8. `scripts/check_packs.py` sanity-checks the packs, including that no deleted
+   full text appears in them; the build fails if any check fails.
 
 ### Reproducibility
 
@@ -81,10 +82,10 @@ in SOURCES.md before shipping.
 studybible-mcp serves a prebuilt `study_bible.db` (~815 MB). We don't derive from
 it because:
 
-- it holds the excluded material (Heiser, Stott, Lennox, Bradley, Burnett) and
-  tables no script at any pin builds (`hlt_*`, a draft Heiser-derived
-  translation; `verse_comparison_scores`, LLM output), so its provenance can't be
-  reproduced or audited row by row;
+- it holds material no script at the pin can rebuild (Burnett, the
+  Harrison–Römhild cross references) and tables no script builds at all (`hlt_*`,
+  a draft Heiser-derived translation; `verse_comparison_scores`, LLM output), so
+  its provenance can't be reproduced or audited row by row;
 - the file is replaced in place on their server (no version, changing ETag), so a
   build from it can't be pinned;
 - its similarity data are OpenAI `text-embedding-3-small` vectors in sqlite-vec
@@ -104,15 +105,13 @@ The split (`packs.json`):
 | Pack | Tables | Used by |
 |---|---|---|
 | `core` (first launch) | `verses` (TAHOT/TAGNT words, morphology, Strong's, glosses), `bsb_verses`, `passages`, `lexicon`, `morphology`, `names`, `acai_entities`, `cross_references`, `thematic_references`, `torah_weave_units`, `torah_weave_cells`, `similar_verses`, `similar_passages` | `lookup_verse`, `word_study`, `search_lexicon`, `search_by_strongs`, `get_cross_references`, `parse_morphology`, `lookup_name`, `find_similar_passages`, `get_torah_weave` |
-| `notes` | `aquifer_content` (study notes, dictionary, UW and SIL translator notes, key terms), `ane_entries`, `ane_book_mappings`, `theology_content`, `theology_verse_index`, `theology_themes`, `theology_theme_index` | `get_study_notes`, `get_bible_dictionary`, `get_key_terms`, `get_ane_context`, `get_theology_context` |
+| `notes` | `aquifer_content` (study notes, dictionary, UW and SIL translator notes, key terms), `ane_entries`, `ane_book_mappings`, `theology_content`, `theology_verse_index`, `theology_themes`, `theology_theme_index`, `textual_variant_cases`, `textual_variant_readings`, `textual_variant_witnesses`, `textual_critical_judgments`, `textual_theological_interpretations`, `textual_author_claims`, `textual_translation_decisions`, `nt_ot_lxx_quote_hints` | `get_study_notes`, `get_bible_dictionary`, `get_key_terms`, `get_ane_context`, `get_theology_context`, `get_textual_variant`, and `lookup_verse`'s textual-variant and LXX-quotation cues |
 | `lxx` | `biblical_version_verses` | `compare_biblical_versions` (MT side comes from core `verses`) |
 | `ancient` | `ancient_source_passages`, `ancient_source_passages_fts` (FTS5), `ancient_source_biblical_links`, `ancient_source_notes` | `search_ancient_sources`, `lookup_ancient_source` |
 | `graph` | `graph_people`, `graph_places`, `graph_events`, `graph_people_groups`, `graph_family_edges`, `graph_person_event_edges`, `graph_event_place_edges`, `graph_person_group_edges`, `graph_verse_mentions` | `people_in_passage`, `explore_genealogy`, `explore_person_events`, `explore_place`, `find_connection`, `graph_enriched_search` |
 
-Left out: the tables only the excluded material fills (`textual_variant_*`,
-`textual_*`, `nt_ot_lxx_quote_hints`, `hlt_*`; `make_packs.py` checks they are
-empty) and the `heiser_*` compatibility views. `get_textual_variant` therefore has
-no data (see SOURCES.md).
+Left out: the `hlt_*` tables, which no script at the pin fills (`make_packs.py`
+checks they are empty), and the `heiser_*` compatibility views.
 
 Sizes from the build at the current pins (MB = 10^6 bytes; gzip -9, zstd -19).
 Every build writes them, with row counts and sha256, to `out/sizes.tsv` and
@@ -121,11 +120,11 @@ Every build writes them, with row counts and sha256, to `out/sizes.tsv` and
 | Pack | Rows | Raw | gzip | zstd |
 |---|---:|---:|---:|---:|
 | core | 1,696,932 | 181.9 MB | 40.6 MB | 26.1 MB |
-| notes | 121,060 | 284.1 MB | 39.1 MB | 25.9 MB |
+| notes | 122,989 | 285.0 MB | 39.4 MB | 26.1 MB |
 | lxx | 30,617 | 39.1 MB | 20.6 MB | 17.6 MB |
 | ancient | 50,030 | 95.1 MB | 27.3 MB | 20.4 MB |
 | graph | 64,703 | 6.0 MB | 1.7 MB | 1.3 MB |
-| all | | 606.1 MB | 129.3 MB | 91.2 MB |
+| all | | 607.0 MB | 129.6 MB | 91.4 MB |
 
 Most of core is `verses` (92 MB: the word-by-word JSON), `lexicon` (27 MB),
 cross references with their indexes (26 MB) and the two similarity tables (9 MB
@@ -159,3 +158,62 @@ normalised mean of its verses'. On a spot check against studybible-mcp's OpenAI
 vectors (which embed the word-gloss text), the BSB vectors find the quotation
 parallels the gloss vectors miss: Psalm 22:18 → John 19:24 and Matthew 27:35,
 Deuteronomy 6:5 → Mark 12:30 and Matthew 22:37, Isaiah 53:5 → 1 Peter 2:24.
+
+## Publish
+
+The app reads one URL: **https://bezalel.genericjam.com/packs/manifest.json**.
+It is served from the Cloudflare R2 bucket `bezalel-packs` (custom domain, no
+egress fees). After a rebuild, and after committing `data/`:
+
+```sh
+python3 data/scripts/publish.py --dry-run   # what would be uploaded
+python3 data/scripts/publish.py
+```
+
+It uploads `out/<pack>.sqlite.zst` to `packs/v<N>/` with
+`Cache-Control: public, max-age=31536000, immutable`, then the manifest to
+`packs/manifest.json` with `Cache-Control: no-cache`, last, so a client never sees
+a manifest naming packs that aren't there yet. N is one more than the published
+manifest's `data_version`, or `--version N`. Pack objects are never replaced: one
+already at `packs/v<N>/` is accepted only if byte-identical (an interrupted
+publish resumes), and anything else stops the publish; if a publish was aborted
+and `data/out` rebuilt since, rerun with a fresh `--version` (unreferenced
+`v<N>` objects are harmless). Every upload is fetched back from
+`https://bezalel.genericjam.com` and its size and sha256 compared; these reads
+add a unique query string so they reach R2 rather than an edge copy (Cloudflare
+caches 404s too). Uploads use
+`npx wrangler@4 r2 object put … --remote`, so wrangler must be logged in to the
+account that owns the bucket. Wrangler uploads files up to 315 MB; the largest
+compressed pack is 26 MB.
+
+The manifest (`schema` 1):
+
+```json
+{
+  "schema": 1,
+  "data_version": 1,
+  "built": "2026-10-15T19:30:00Z",
+  "bezalel_commit": "<commit of the data/ that built the packs>",
+  "studybible_mcp": {"repo": "https://github.com/djayatillake/studybible-mcp", "commit": "38cef28d…"},
+  "sources": "https://github.com/GenericJam/bezalel/blob/master/data/SOURCES.md",
+  "packs": [
+    {
+      "name": "core",
+      "description": "…",
+      "required": true,
+      "licence": "CC BY 4.0 (STEPBible, …); …",
+      "url": "https://bezalel.genericjam.com/packs/v1/core.sqlite.zst",
+      "compression": "zstd",
+      "size": 26110356, "sha256": "…",
+      "raw_size": 181886976, "raw_sha256": "…",
+      "tables": ["verses", "…"]
+    }
+  ]
+}
+```
+
+`size`/`sha256` are of the download; `raw_size`/`raw_sha256` of the decompressed
+SQLite file, which the app checks after decompressing. `required` packs (core) are
+fetched on first launch; the others on demand. An app updates when the manifest's
+`data_version` is higher than the one it holds, fetching only packs whose
+`raw_sha256` changed.
