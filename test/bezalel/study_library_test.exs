@@ -5,7 +5,7 @@ defmodule Bezalel.StudyLibraryTest do
   @moduletag :screen
 
   alias Bezalel.{AppScreen, AttributionsScreen, Packs}
-  alias Bezalel.Test.{Browser, PackServer}
+  alias Bezalel.Test.{Browser, MemoryStore, PackServer}
   alias Bezalel.Views.StudyLibrary
 
   setup do
@@ -15,6 +15,9 @@ defmodule Bezalel.StudyLibraryTest do
     url = PackServer.publish(server, base, 1, [{"core", core, true}, {"notes", notes, false}])
     Application.put_env(:bezalel, :packs_manifest_url, url)
     dir = :sys.get_state(Packs).dir
+    # No API key left by another module: Settings' key rows have their own
+    # "Remove" buttons.
+    MemoryStore.clear()
 
     # This test's library replaces the last one's.
     :ok = Packs.subscribe()
@@ -53,6 +56,11 @@ defmodule Bezalel.StudyLibraryTest do
 
   defp settings, do: AppScreen |> mount_screen() |> render_info({:tap, {:tab, :settings}})
 
+  # The pack's own button (a pill Box tapping {:packs, event}).
+  defp pack_button?(view, event) do
+    view |> find_all(:box) |> Enum.any?(&match?(%{props: %{on_tap: {_, {:packs, ^event}}}}, &1))
+  end
+
   test "first launch offers the core pack with its sizes, once; Download fetches it in the background",
        ctx do
     Mob.State.delete(:bezalel_packs_offered)
@@ -90,7 +98,7 @@ defmodule Bezalel.StudyLibraryTest do
     view = render_info(view, {:tap, {:packs, {:download, "notes"}}})
     view = follow(view, notice("The notes pack is ready."))
     assert text(view) =~ "On the phone · "
-    assert find(view, :text, text: "Remove")
+    assert pack_button?(view, {:remove, "notes"})
 
     view = render_info(view, {:tap, {:packs, :check}})
     view = follow(view, notice("Up to date: study library version 1."))
@@ -98,7 +106,8 @@ defmodule Bezalel.StudyLibraryTest do
 
     view = render_info(view, {:tap, {:packs, {:remove, "notes"}}})
     assert assigns(view).toast.text == "Removed the Notes pack."
-    refute find(view, :text, text: "Remove")
+    refute pack_button?(view, {:remove, "notes"})
+    assert pack_button?(view, {:download, "notes"})
   end
 
   test "a failed download says why and offers it again", ctx do
