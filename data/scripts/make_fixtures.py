@@ -1,6 +1,6 @@
 """Cut the small test packs from the built packs.
 
-  python3 data/scripts/make_fixtures.py [--packs data/out] [--out test/fixtures/packs]
+  python3 data/scripts/make_fixtures.py [--packs data/out] [--out test/fixtures/packs] [--pack core ...]
 
 Each fixture is a pack file with the same tables, schemas and indexes as the
 real pack (data/out/<pack>.sqlite), holding only the rows around a few
@@ -8,7 +8,8 @@ passages: Genesis 1-2, Exodus 31, Psalm 22, John 3 and Jude. Rows keep their
 ids, so references between tables (similar_passages -> passages -> verses)
 stay valid. What each table keeps:
 
-core      the verses of those chapters, the BSB text of every kept verse, the
+core      the verses of those chapters and of EXTRA_VERSES, the BSB text of
+          every kept verse, the
           lexicon entries the words of Exodus 31 cite plus the entries the
           tests read or search for, the morphology codes those chapters use
           plus the tests' codes, the names first mentioned there (and the
@@ -16,15 +17,22 @@ core      the verses of those chapters, the BSB text of every kept verse, the
           those verses, all thematic references, the Torah weave units over
           those chapters, and the nearest similar passages of a few anchor
           verses with the verses each passage's preview shows
-graph     the verse mentions in those chapters and the people, places and
-          events they name, with the edges among them
-notes     the study notes, dictionary and translator notes over Exodus 31 and
-          John 3, the ANE entries mapped to them, all theology themes and the
-          theology content indexed to them, and the textual-variant cases and
-          LXX quotation hints over all the chapters above
-lxx       the Septuagint rows of those chapters
-ancient   the ancient-source passages linked to those chapters, with their
-          links, notes and search-index rows
+graph     the verse mentions in those chapters; the people they name, with
+          all their ancestors, two generations of descendants, and the
+          spouses and siblings of those (likewise for GRAPH_PEOPLE), and the
+          people born or died at GRAPH_PLACES, with the edges among them; all
+          places, events and event-place edges; the GRAPH_PLACES' mentions
+notes     the study notes and translator notes over Exodus 31 and John 3, the
+          dictionary articles and key terms AQUIFER_QUERIES find, the ANE
+          entries mapped to ANE_CHAPTERS, all theology themes and the theology
+          content indexed to THEOLOGY_CHAPTERS or filed under THEOLOGY_THEMES,
+          and all the textual-variant cases
+          and LXX quotation hints (about 100 KB)
+lxx       the Septuagint rows of those chapters and of EXTRA_VERSES, and the
+          Greek-numbered rows of LXX_EXTRA
+ancient   the ancient-source passages linked to those chapters and those
+          overlapping ANCIENT_CITATIONS, with their links, notes and
+          search-index rows
 
 The lexicon (BDB and LSJ definitions run to several KB an entry) and the
 notes are the large tables, hence the narrower cut there. Run this after a
@@ -72,6 +80,64 @@ MORPHOLOGY_EXTRA = ["V-AAI-3S", "N-GSF", "V-PAI-3S", "HVqp3ms"]
 NAME_QUERIES = ["Bezalel", "Ai", "Judah", "David", "Uri"]
 # A passage preview shows at most this many verses (PASSAGE_PREVIEW_VERSES).
 PREVIEW_VERSES = 30
+# Ancient-source passages the tests cite (corpus, work key, sort key): each
+# passage whose sort range contains the key is kept.
+ANCIENT_CITATIONS = [
+    ("josephus", "antiquities", 18116), ("josephus", "antiquities", 18120),
+    ("josephus", "life", 1), ("josephus", "jewish_war", 6316),
+    ("qumran", "damascus_document", 6011), ("qumran", "community_rule", 6011),
+    ("qumran", "pesher_habakkuk", 8008),
+    ("rabbinic", "mishnah_shekalim", 1001), ("rabbinic", "mishnah_sukkah", 4009),
+    ("pseudepigrapha", "4_ezra", 7028), ("pseudepigrapha", "4_ezra", 7035),
+    ("pseudepigrapha", "4_ezra", 7106),
+    ("philo", "opif", 26), ("targum", "onkelos_genesis", 49010),
+]
+# Verses beyond CHAPTERS (book, chapter, first, last) the tier 2 tests read:
+# lookup_verse's textual-variant and quotation hints, and
+# compare_biblical_versions' MT and LXX sides.
+EXTRA_VERSES = [
+    ("Psa", 40, 5, 8),
+    ("Psa", 82, 1, 8),
+    ("Heb", 10, 5, 7),
+    ("Deu", 32, 43, 43),
+    ("Dan", 3, 24, 25),
+    ("Dan", 7, 13, 13),
+    ("Job", 38, 6, 7),
+    ("Mrk", 14, 62, 62),
+    ("Mat", 26, 64, 64),
+]
+# Septuagint rows kept by their Greek edition position (book, chapter, first,
+# last): LXX-only verses (the Prayer of Azariah) and an LXX-only book.
+LXX_EXTRA = [("Dan", 3, 24, 25), ("Tob", 1, 1, 2)]
+# People whose family the graph tests walk besides those the chapters
+# mention (all their ancestors, two generations of descendants, spouses and
+# siblings), and places whose history they read (with the people born or
+# buried there, and the places' verse mentions, which rank namesakes).
+GRAPH_PEOPLE = ["Abraham", "Melchisedec"]
+GRAPH_PLACES = ["Hebron", "Ai"]
+# Dictionary and key-term searches the tests run (get_bible_dictionary,
+# get_key_terms): the articles the full pack returns for each (its exact
+# title matches, else its first ten title or text matches).
+AQUIFER_QUERIES = [
+    ("dictionary", "abraham"), ("dictionary", "tabernacle"), ("dictionary", "jubilee"),
+    ("key_terms", "atonement"), ("key_terms", "grace"),
+]
+# (book, chapter) whose ANE entries are kept: Genesis 15 has direct, broad and
+# dropped whole-book entries; in Genesis 38 a whole-book entry citing it is
+# promoted.
+ANE_CHAPTERS = [("Exo", 31), ("Jhn", 3), ("Gen", 15), ("Gen", 38)]
+# (book, chapter) whose theology content is kept: Psalm 82 has primary and
+# supporting matches by several authors.
+THEOLOGY_CHAPTERS = [("Exo", 31), ("Jhn", 3), ("Psa", 82)]
+# Themes whose theology content is kept: atonement_models alternates authors.
+THEOLOGY_THEMES = ["atonement_models"]
+
+
+def verse_clause(book_col: str, chapter_col: str, verse_col: str, spans) -> str:
+    return "(" + " OR ".join(
+        f"({book_col} = '{b}' AND {chapter_col} = {c} AND {verse_col} BETWEEN {v1} AND {v2})"
+        for b, c, v1, v2 in spans
+    ) + ")"
 
 
 def chapter_clause(book_col: str, chapter_col: str, books=lambda c: c[0], chapters=CHAPTERS) -> str:
@@ -129,6 +195,7 @@ def lexicon_hits(src: sqlite3.Connection, query: str, language: str | None) -> l
 
 def core_filters(src: sqlite3.Connection) -> dict[str, str]:
     main = ids(src, f"SELECT id FROM verses WHERE {chapter_clause('book', 'chapter')}")
+    extra = ids(src, f"SELECT id FROM verses WHERE {verse_clause('book', 'chapter', 'verse', EXTRA_VERSES)}")
     anchors = ids(src, f"SELECT id FROM verses WHERE reference IN {in_list(ANCHORS)}")
     if len(anchors) != len(ANCHORS):
         sys.exit(f"anchor verses missing: {ANCHORS}")
@@ -141,7 +208,7 @@ def core_filters(src: sqlite3.Connection) -> dict[str, str]:
         f"SELECT start_verse_id, end_verse_id FROM passages WHERE id IN {in_list(passages)}"
     ):
         preview += ids(src, f"SELECT id FROM verses WHERE id BETWEEN {start} AND {end} ORDER BY id LIMIT {PREVIEW_VERSES}")
-    verses = sorted(set(main) | set(preview))
+    verses = sorted(set(main) | set(extra) | set(preview))
 
     # Entries the words of one chapter cite (lookup_verse needs none: the
     # words carry their glosses), and the ones the tests read or search for.
@@ -197,19 +264,46 @@ def core_filters(src: sqlite3.Connection) -> dict[str, str]:
 def graph_filters(src: sqlite3.Connection) -> dict[str, str]:
     mentions = like_any("verse_ref", [f"{c[1]}.{c[2]}.%" for c in CHAPTERS])
     rows = src.execute(f"SELECT DISTINCT entity_type, entity_id FROM graph_verse_mentions WHERE {mentions}").fetchall()
-    people = [i for t, i in rows if t == "person"]
-    places = [i for t, i in rows if t == "place"]
-    events = [i for t, i in rows if t == "event"]
+    roots = {i for t, i in rows if t == "person"}
+    roots |= set(ids(src, f"SELECT id FROM graph_people WHERE name IN {in_list(GRAPH_PEOPLE)}"))
+    parents: dict[str, set] = {}
+    children: dict[str, set] = {}
+    others: dict[str, set] = {}
+    for a, b, rel in src.execute("SELECT from_person_id, to_person_id, relationship_type FROM graph_family_edges"):
+        if rel in ("father_of", "mother_of"):
+            parents.setdefault(b, set()).add(a)
+            children.setdefault(a, set()).add(b)
+        else:
+            others.setdefault(a, set()).add(b)
+            others.setdefault(b, set()).add(a)
+    # Every ancestor of the roots, their descendants two generations down,
+    # then the spouses and siblings of all of those.
+    people = set(roots)
+    todo = list(roots)
+    while todo:
+        for parent in parents.get(todo.pop(), ()):
+            if parent not in people:
+                people.add(parent)
+                todo.append(parent)
+    generation = set(roots)
+    for _ in range(2):
+        generation = {c for p in generation for c in children.get(p, ())}
+        people |= generation
+    people |= {o for p in list(people) for o in others.get(p, ())}
+    places = ids(src, f"SELECT id FROM graph_places WHERE name IN {in_list(GRAPH_PLACES)}")
+    people |= set(ids(src, f"SELECT id FROM graph_people WHERE birth_place_id IN {in_list(places)} OR death_place_id IN {in_list(places)}"))
+    people = in_list(people)
+    place_mentions = f"entity_type = 'place' AND entity_id IN {in_list(places)}"
     return {
-        "graph_people": f"id IN {in_list(people)}",
-        "graph_places": f"id IN {in_list(places)}",
-        "graph_events": f"id IN {in_list(events)}",
-        "graph_people_groups": f"name IN (SELECT group_name FROM src.graph_person_group_edges WHERE person_id IN {in_list(people)})",
-        "graph_family_edges": f"from_person_id IN {in_list(people)} AND to_person_id IN {in_list(people)}",
-        "graph_person_event_edges": f"person_id IN {in_list(people)} AND event_id IN {in_list(events)}",
-        "graph_event_place_edges": f"event_id IN {in_list(events)} AND place_id IN {in_list(places)}",
-        "graph_person_group_edges": f"person_id IN {in_list(people)}",
-        "graph_verse_mentions": mentions,
+        "graph_people": f"id IN {people}",
+        "graph_places": "1",
+        "graph_events": "1",
+        "graph_people_groups": f"name IN (SELECT group_name FROM src.graph_person_group_edges WHERE person_id IN {people})",
+        "graph_family_edges": f"from_person_id IN {people} AND to_person_id IN {people}",
+        "graph_person_event_edges": f"person_id IN {people}",
+        "graph_event_place_edges": "1",
+        "graph_person_group_edges": f"person_id IN {people}",
+        "graph_verse_mentions": f"{mentions} OR ({place_mentions})",
     }
 
 
@@ -218,58 +312,75 @@ def notes_filters(src: sqlite3.Connection) -> dict[str, str]:
         src,
         "SELECT DISTINCT entry_id FROM ane_book_mappings WHERE "
         + " OR ".join(
-            f"(book = '{c[0]}' AND (chapter_start IS NULL OR (chapter_start <= {c[2]} "
-            f"AND COALESCE(chapter_end, chapter_start) >= {c[2]})))"
-            for c in NOTES_CHAPTERS
+            f"(book = '{book}' AND (chapter_start IS NULL OR (chapter_start <= {chapter} "
+            f"AND (chapter_end IS NULL OR chapter_end >= {chapter}))))"
+            for book, chapter in ANE_CHAPTERS
         ),
     )
     content = ids(
         src,
-        f"SELECT DISTINCT content_id FROM theology_verse_index WHERE "
-        f"{chapter_clause('book', 'chapter', chapters=NOTES_CHAPTERS)}",
+        "SELECT DISTINCT content_id FROM theology_verse_index WHERE "
+        + " OR ".join(f"(book = '{b}' AND chapter = {c})" for b, c in THEOLOGY_CHAPTERS)
+        + f" UNION SELECT content_id FROM theology_theme_index WHERE theme_key IN {in_list(THEOLOGY_THEMES)}",
     )
-    # Textual variants over the fixture chapters, and the quotation hints whose
-    # quoting or quoted verse is in them (with the cases they link to).
-    hint_refs = like_any("nt_reference", [f"{c[0]}.{c[2]}.%" for c in CHAPTERS]) + " OR " + like_any(
-        "ot_reference", [f"{c[0]}.{c[2]}.%" for c in CHAPTERS]
-    )
-    cases = ids(
-        src,
-        f"SELECT id FROM textual_variant_cases WHERE {chapter_clause('book', 'chapter')} "
-        f"UNION SELECT variant_case_id FROM nt_ot_lxx_quote_hints "
-        f"WHERE variant_case_id IS NOT NULL AND ({hint_refs})",
-    )
-    by_case = f"case_id IN {in_list(cases)}"
+    # Bezalel.Study.Aquifer.search/2: exact titles, else the first ten matches.
+    articles = []
+    for resource_type, query in AQUIFER_QUERIES:
+        hits = ids(
+            src,
+            f"SELECT id FROM aquifer_content WHERE resource_type = '{resource_type}' "
+            f"AND LOWER(title) = LOWER('{query}')",
+        )
+        if not hits:
+            like = f"'%{query}%'"
+            hits = ids(
+                src,
+                f"SELECT id FROM aquifer_content WHERE resource_type = '{resource_type}' "
+                f"AND (LOWER(title) LIKE LOWER({like}) OR LOWER(content_plain) LIKE LOWER({like})) "
+                f"ORDER BY CASE WHEN LOWER(title) LIKE LOWER({like}) THEN 0 ELSE 1 END, LENGTH(title) "
+                f"LIMIT 10",
+            )
+        articles += hits
     return {
         "aquifer_content": range_clause(
             "book_num", "chapter_start", "chapter_end", books=lambda c: c[3], chapters=NOTES_CHAPTERS
-        ),
+        )
+        + f" OR id IN {in_list(articles)}",
         "ane_entries": f"id IN {in_list(entries)}",
         "ane_book_mappings": f"entry_id IN {in_list(entries)}",
         "theology_content": f"id IN {in_list(content)}",
         "theology_verse_index": f"content_id IN {in_list(content)}",
         "theology_themes": "1",
         "theology_theme_index": f"content_id IN {in_list(content)}",
-        "textual_variant_cases": f"id IN {in_list(cases)}",
-        "textual_variant_readings": by_case,
-        "textual_variant_witnesses": by_case,
-        "textual_critical_judgments": by_case,
-        "textual_theological_interpretations": by_case,
-        "textual_author_claims": by_case,
-        "textual_translation_decisions": by_case,
-        "nt_ot_lxx_quote_hints": hint_refs,
+        # All of them: 30 cases and 22 quotation hints, about 100 KB.
+        "textual_variant_cases": "1",
+        "textual_variant_readings": "1",
+        "textual_variant_witnesses": "1",
+        "textual_critical_judgments": "1",
+        "textual_theological_interpretations": "1",
+        "textual_author_claims": "1",
+        "textual_translation_decisions": "1",
+        "nt_ot_lxx_quote_hints": "1",
     }
 
 
 def lxx_filters(_src: sqlite3.Connection) -> dict[str, str]:
-    return {"biblical_version_verses": chapter_clause("canonical_book", "canonical_chapter")}
+    canonical = chapter_clause("canonical_book", "canonical_chapter")
+    extra = verse_clause("canonical_book", "canonical_chapter", "canonical_verse", EXTRA_VERSES)
+    greek = verse_clause("edition_book", "edition_chapter", "edition_verse", LXX_EXTRA)
+    return {"biblical_version_verses": f"{canonical} OR {extra} OR {greek}"}
 
 
 def ancient_filters(src: sqlite3.Connection) -> dict[str, str]:
+    cited = " OR ".join(
+        f"(corpus = '{corpus}' AND work_key = '{work}' AND sort_start <= {key} AND sort_end >= {key})"
+        for corpus, work, key in ANCIENT_CITATIONS
+    )
     passages = ids(
         src,
         "SELECT DISTINCT passage_id FROM ancient_source_biblical_links WHERE "
-        + sort_clause("biblical_book", "sort_start", "sort_end"),
+        + sort_clause("biblical_book", "sort_start", "sort_end")
+        + f" UNION SELECT id FROM ancient_source_passages WHERE {cited}",
     )
     return {
         "ancient_source_passages": f"id IN {in_list(passages)}",
@@ -349,10 +460,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--packs", type=Path, default=root / "data" / "out")
     parser.add_argument("--out", type=Path, default=root / "test" / "fixtures" / "packs")
+    parser.add_argument("--pack", action="append", choices=sorted(PACKS), help="only these packs (repeatable)")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     for name, filters in PACKS.items():
-        cut(args.packs / f"{name}.sqlite", args.out / f"{name}.sqlite", filters)
+        if args.pack is None or name in args.pack:
+            cut(args.packs / f"{name}.sqlite", args.out / f"{name}.sqlite", filters)
 
 
 if __name__ == "__main__":

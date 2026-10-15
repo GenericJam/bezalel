@@ -67,6 +67,9 @@ defmodule Bezalel.Study.Args do
   defp in_range(n) when n >= @int64_min and n <= @int64_max, do: {:ok, n}
   defp in_range(_n), do: :error
 
+  @doc "Is `n` an integer SQLite can bind (64-bit)?"
+  defguard is_sqlite_integer(n) when is_integer(n) and n >= @int64_min and n <= @int64_max
+
   defp parse(text) do
     case Integer.parse(String.trim(text)) do
       {n, ""} -> {:ok, n}

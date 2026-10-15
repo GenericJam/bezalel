@@ -30,10 +30,13 @@ defmodule Bezalel.Study.Verses do
     if row, do: hd(attach_bsb(conn, [row]))
   end
 
+  # A number beyond SQLite's 64-bit range can't be bound, and names no verse.
+  @max_number 0x7FFFFFFFFFFFFFFF
+
   defp by_number(conn, normalized) do
     with [book, chapter, verse] <- String.split(normalized, "."),
-         {chapter, ""} <- Integer.parse(chapter),
-         {verse, ""} <- Integer.parse(verse) do
+         {chapter, ""} when chapter in 0..@max_number//1 <- Integer.parse(chapter),
+         {verse, ""} when verse in 0..@max_number//1 <- Integer.parse(verse) do
       DB.one(
         conn,
         "SELECT * FROM verses WHERE book = ? AND chapter = ? AND verse = ? ORDER BY id LIMIT 1",

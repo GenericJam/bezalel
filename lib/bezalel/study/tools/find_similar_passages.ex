@@ -49,8 +49,9 @@ defmodule Bezalel.Study.Tools.FindSimilarPassages do
 
     Establishing which of these applies to a given pair requires the passages'
     genre, historical setting, and literary context — `lookup_verse` returns genre
-    background and the text in context, and `get_cross_references` indicates
-    whether the link is attested in the cross-reference tradition.\
+    background, `get_study_notes` and `get_ane_context` cover context and original
+    audience, and `get_cross_references` indicates whether the link is attested in
+    the cross-reference tradition.\
     """
   end
 

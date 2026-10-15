@@ -5,7 +5,7 @@ defmodule Bezalel.Study.ToolsTest do
 
   alias Bezalel.Study.{Prompt, Tools}
 
-  @names Enum.map(Tools.tier1(), & &1.name())
+  @names Enum.map(Tools.all(), & &1.name())
 
   # `snake_case` names in backticks that look like tool names.
   defp tools_named(text) do
@@ -19,16 +19,16 @@ defmodule Bezalel.Study.ToolsTest do
   end
 
   test "every tool is a rho tool the model can be offered, under a unique name" do
-    for tool <- Tools.tier1() do
+    for tool <- Tools.all() do
       assert Rho.Tool.tool?(tool)
       assert %ReqLLM.Tool{} = Rho.Tool.to_req_llm(tool)
     end
 
-    assert Enum.count(Enum.uniq(@names)) == 9
+    assert Enum.count(Enum.uniq(@names)) == 25
   end
 
   test "tool descriptions point only at tools Bezalel has" do
-    for tool <- Tools.tier1() do
+    for tool <- Tools.all() do
       assert tools_named(tool.description()) -- @names == [], tool.name()
     end
   end

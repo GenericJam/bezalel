@@ -35,8 +35,9 @@ defmodule Bezalel.Study.Tools.LookupName do
     - **Spouse** (e.g. Ruth ↔ Boaz)
 
     Relevant for identifying a named figure or location and for the immediate
-    family and reference context around it. `people_in_passage` lists who and
-    what a passage mentions.\
+    family and reference context around it. Multi-generation lineages are covered by
+    `explore_genealogy`, a person's life events by `explore_person_events`, and a
+    location's full history by `explore_place`.\
     """
   end
 

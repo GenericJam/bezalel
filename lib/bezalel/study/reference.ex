@@ -289,6 +289,18 @@ defmodule Bezalel.Study.Reference do
   end
 
   @doc """
+  The book code of a name exactly as the abbreviation table spells it
+  (case and surrounding space aside), else the name's first three
+  characters in title case: studybible-mcp's reading of ANE key references
+  ("1 Cor" is 1Co, "Exod" is Exo, "Phm" is Phm).
+  """
+  @spec abbreviation(String.t()) :: String.t()
+  def abbreviation(name) do
+    trimmed = String.trim(name)
+    Map.get(@book_codes, String.downcase(trimmed)) || prefix_code(trimmed)
+  end
+
+  @doc """
   Rewrites a verse-only citation of a single-chapter book as chapter 1:
   "Jude 3" is "Jude 1:3", "Philemon 4-6" is "Philemon 1:4-6". A bare "Jude"
   or "Jude 1" is the chapter ("Jude 1"). Anything else comes back unchanged.
@@ -310,6 +322,10 @@ defmodule Bezalel.Study.Reference do
       _ -> reference
     end
   end
+
+  @doc "Is `code` a single-chapter book (Obadiah, Philemon, 2 and 3 John, Jude)?"
+  @spec single_chapter_book?(String.t() | nil) :: boolean()
+  def single_chapter_book?(code), do: MapSet.member?(@single_chapter_books, code)
 
   @doc """
   Parses a verse, verse range, cross-chapter range or whole chapter (or

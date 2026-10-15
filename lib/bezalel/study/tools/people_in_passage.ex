@@ -24,8 +24,9 @@ defmodule Bezalel.Study.Tools.PeopleInPassage do
     Metadata — for example, Genesis 22 returns Abraham, Isaac, the angel of the LORD,
     and Moriah; Acts 15 returns Paul, Barnabas, James, Jerusalem, and Antioch.
 
-    Relevant for establishing the cast and setting of a narrative passage;
-    `lookup_name` gives the details of any one of them.\
+    Relevant for establishing the cast and setting of a narrative passage. Related
+    tools: `graph_enriched_search` is verse-level only but adds the verse text and
+    family relationships for each person found.\
     """
   end
 

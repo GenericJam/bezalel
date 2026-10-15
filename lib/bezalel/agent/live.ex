@@ -1,8 +1,8 @@
 defmodule Bezalel.Agent.Live do
   @moduledoc """
   The live study agent: rho's loop (`Rho.Loop`) with the study system
-  prompt (`Bezalel.Study.Prompt`) and the tier 1 study tools
-  (`Bezalel.Study.Tools.tier1/0`, plus rho's `read_artifact` for a result
+  prompt (`Bezalel.Study.Prompt`) and the study tools
+  (`Bezalel.Study.Tools.all/0`, plus rho's `read_artifact` for a result
   too long to send whole), on the model chosen in Settings.
 
   **One loop per conversation being answered**, started on its first
@@ -41,7 +41,7 @@ defmodule Bezalel.Agent.Live do
 
   @doc "The tools a loop offers."
   @spec tools() :: [module()]
-  def tools, do: Tools.tier1() ++ [Rho.Tools.ReadArtifact]
+  def tools, do: Tools.all() ++ [Rho.Tools.ReadArtifact]
 
   @impl true
   def ask(conversation_id, messages, model, subscriber) do

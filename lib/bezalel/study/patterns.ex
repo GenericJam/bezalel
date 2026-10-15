@@ -45,7 +45,45 @@ defmodule Bezalel.Study.Patterns do
     # Bezalel.Agent.Card: punctuation and quotes around an English word.
     word_edges: {~S"^[\p{P}\p{S}]+|[\p{P}\p{S}]+$", "u"},
     # Bezalel.Agent.Reply: a block's header, its first sentence or line.
-    first_sentence: {~S"\A.+?(?:[.?!:](?=\s)|\n|\z)", "su"}
+    first_sentence: {~S"\A.+?(?:[.?!:](?=\s)|\n|\z)", "su"},
+    # Ancient sources (database.py, tools.py, server.py, corpora/*.py).
+    # parse_passage_reference's _PASSAGE_RE, for parse_biblical_range.
+    biblical_range:
+      {~S"^(?<book>[0-9]?\s*[a-z]+(?:\s+[a-z]+)*)\s*(?<c1>[0-9]+)(?::(?<v1>[0-9]+)(?<s1>[a-z]?))?" <>
+         ~S"(?:\s*[-–—]\s*(?:(?<c2>[0-9]+):)?(?<v2>[0-9]+)(?<s2>[a-z]?))?$", "iu"},
+    ancient_word: {~S"\w+", "u"},
+    ancient_marks: {~S"[\p{Mn}\p{Cf}]", "u"},
+    ancient_combining: {~S"\p{M}", "u"},
+    editorial_signs: {~S"[\[\]⟨⟩〈〉<>{}()^¦]", "u"},
+    hebrew_word: {~S"^[\x{05d0}-\x{05ea}]+$", "u"},
+    original_script: {~S"[\x{0370}-\x{03ff}\x{1f00}-\x{1fff}\x{0590}-\x{05ff}]", "u"},
+    nc_license: {~S"CC BY-NC(-SA)? (\d\.\d)", ""},
+    trailing_locator: {~S"[\s.,]+[0-9ivxlc][0-9ivxlc\s.:,\-–]*$", "iu"},
+    name_token: {~S"[^\W_]+", "u"},
+    citation_skip: {~S"^[\s.,]*", "u"},
+    apostrophes: {~S"['’ʼ]", "u"},
+    locator_dash: {~S"\s*[-‐‑‒–—]\s*", "u"},
+    locator_separator: {~S"\s*[.:,]\s*|\s+", "u"},
+    locator_trailing: {~S"[\s.;,]+$", "u"},
+    roman: {~S"^(?=[mdclxvi])m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$", "iu"},
+    ascii_digits: {~S"^[0-9]+$", ""},
+    locator_strip_left: {~S"\A[ .,]+", ""},
+    locator_strip_right: {~S"[ .,]+\z", ""},
+    line_breaks: {~S"\r\n|[\n\r\x{0b}\x{0c}\x{1c}-\x{1e}\x{85}\x{2028}\x{2029}]", "u"},
+    # get_textual_variant: a normalized single verse ('Psa.40.6', '1Ki.2.35a').
+    single_verse_reference: {~S"^[1-3]?[A-Za-z]{2,3}\.[0-9]+\.[0-9]+[a-z]?$", ""},
+    # A not-preserved witness's "(none preserved)" suffix.
+    none_preserved: {~S"\s*\(none preserved\)\s*$", "iu"},
+    # compare_biblical_versions: a MT verse's Hebrew numbering, 'Psa.82.0(82.1)'.
+    hebrew_numbering: {~S"\(([0-9]+)\.([0-9]+)\)$", ""},
+    # A comparison reference's book, for the continuation note (server.py _REFERENCE_BOOK).
+    reference_book:
+      {~S"^\s*(.*?\D)\s*\d+(?:\s*:\s*\d+)?(?:\s*[-–—]\s*\d+(?:\s*:\s*\d+)?)?\s*$", "u"},
+    # get_ane_context: an ANE entry's key reference's book and chapter
+    # ('Gen 38:6-26', '1 Cor 12:12'; server.py _KEY_REF_PATTERN).
+    ane_key_reference: {~S"^(\d?\s*[A-Za-z]+)\s+(\d+)", ""},
+    # list_research_sources: what a topic loses before matching (_normalise_topic).
+    research_topic_strip: {~S"[^a-z0-9\s]", "u"}
   }
 
   # The cache key carries a hash of the sources, so a hot-loaded version of

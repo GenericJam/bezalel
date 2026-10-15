@@ -1,7 +1,10 @@
 defmodule Bezalel.Study.Tools.LookupVerseTest do
-  # Ported from studybible-mcp's tests/test_lookup_verse.py, against the
-  # fixture packs (test/fixtures/packs: Genesis 1-2, Exodus 31, Psalm 22,
-  # John 3 and Jude from the real core pack).
+  # Ported from studybible-mcp's tests/test_lookup_verse.py (and the
+  # lookup_verse cases of test_textual_variants.py and
+  # test_variant_witnesses.py), against the fixture packs
+  # (test/fixtures/packs: Genesis 1-2, Exodus 31, Psalm 22, John 3 and Jude
+  # from the real core pack, the verses make_fixtures.py's EXTRA_VERSES
+  # names, and all the notes pack's textual-variant cases and quotations).
   use ExUnit.Case, async: true
 
   alias Bezalel.Study.Tools.LookupVerse
@@ -144,5 +147,132 @@ defmodule Bezalel.Study.Tools.LookupVerseTest do
     assert bezalel_verse.english =~ "Bezalel son of Uri"
     assert %{gloss: "Bezalel"} = Enum.find(bezalel_verse.words, &(&1.strongs == "H1212G"))
     assert ~w(H4390 H7307G H2451) -- Enum.map(spirit_verse.words, & &1.strongs) == []
+  end
+
+  describe "hints" do
+    test "a Torah verse or passage points to its weave partners; other books don't" do
+      verse = lookup("Exodus 31:2")
+      assert occurrences(verse, "Torah Weave") == 1
+
+      assert verse =~
+               "*Torah Weave structural partners available for this verse via " <>
+                 "`get_torah_weave` (reference='Exodus 31:2')"
+
+      assert lookup("Genesis 1:1-3") =~
+               "*Torah Weave structural partners are available per verse via " <>
+                 "`get_torah_weave` (e.g. reference='Genesis 1:1')"
+
+      refute lookup("Psalm 22:1") =~ "Torah Weave"
+
+      assert {:ok, %{hints: %{torah_weave: true}}} =
+               LookupVerse.result(%{"reference" => "Ex 31:2"})
+    end
+
+    test "a quotation is cued once from either side" do
+      ot = lookup("Psalm 40:6-8")
+      assert occurrences(ot, "NT↔OT LXX-form quotation") == 1
+      assert ot =~ "Psalm 40:6 quoted in **Hebrews 10:5-7** (vorlage_or_paraphrase)"
+      assert occurrences(ot, "get_cross_references") == 1
+
+      nt = lookup("Hebrews 10:5-7")
+      assert occurrences(nt, "NT↔OT LXX-form quotation") == 1
+      assert nt =~ "quotes **Psalm 40:6** in its LXX form"
+    end
+
+    test "a quotation that agrees with the MT is not called an LXX form" do
+      mark = lookup("Mark 14:62")
+
+      assert mark =~
+               "*NT↔OT quotation: quotes **Daniel 7:13** (agrees_with_mt_and_theodotion)."
+
+      refute mark =~ "LXX form"
+
+      assert lookup("Matthew 26:64") =~
+               "*NT↔OT LXX-form quotation: quotes **Daniel 7:13** in its LXX form (follows_old_greek)."
+    end
+
+    test "a variant is cued with its own verse inside a passage" do
+      single = lookup("Psalm 40:6")
+      assert single =~ "Textual variant catalogued for this verse (LXX_quoted_in_NT)"
+      assert single =~ "`get_textual_variant` (reference='Psalm 40:6')"
+
+      passage = lookup("Psalm 40:5-8")
+
+      assert passage =~
+               "Textual variants catalogued in this passage: Psalm 40:6 (LXX_quoted_in_NT). "
+
+      refute passage =~ "reference='Psalm 40:5-8'"
+      refute lookup("Psalm 40:7-8") =~ "Textual variant"
+    end
+
+    test "translation notes are cued apart from variants" do
+      single = lookup("Psalm 82:6")
+      assert single =~ "Translation and interpretation notes catalogued for this verse"
+      refute single =~ "Textual variant"
+
+      passage = lookup("Psalm 82")
+
+      assert passage =~
+               "catalogued in this passage: Psalm 82:1 (MT_preserved), Psalm 82:6 (MT_preserved). "
+
+      refute passage =~ "Textual variant"
+    end
+
+    test "a verse with both a variant and notes is cued once, as a variant" do
+      verse = lookup("Job 38:7")
+      assert verse =~ "Textual variant catalogued for this verse (LXX_divergence)"
+      refute verse =~ "no manuscript variant"
+
+      passage = lookup("Job 38:6-7")
+      assert passage =~ "Textual variants catalogued in this passage: Job 38:7 (LXX_divergence)"
+      refute passage =~ "no manuscript variant"
+
+      {:ok, %{hints: hints}} = LookupVerse.result(%{"reference" => "Job 38:6-7"})
+      assert [%{reference: "Job 38:7", case_key: "LXX_divergence"}] = hints.variant_cases
+      assert hints.interpretive_cases == []
+    end
+
+    test "result/1 carries the quotations with the side of them in the passage" do
+      {:ok, %{hints: hints}} = LookupVerse.result(%{"reference" => "Daniel 7:13"})
+
+      assert Enum.map(hints.quotations, &{&1.nt_display, &1.side, &1.follows_lxx}) == [
+               {"Mark 14:62", :ot, false},
+               {"Matthew 26:64", :ot, true},
+               {"Matthew 24:30", :ot, true},
+               {"Revelation 1:7", :ot, false}
+             ]
+    end
+  end
+end
+
+defmodule Bezalel.Study.Tools.LookupVerseWithoutNotesTest do
+  # Changes the packs directory, so not async.
+  use ExUnit.Case, async: false
+
+  alias Bezalel.Study.Tools.LookupVerse
+
+  setup do
+    fixtures = Application.fetch_env!(:bezalel, :study_packs_dir)
+    dir = Path.join(System.tmp_dir!(), "bezalel-packs-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    File.ln_s!(Path.join(fixtures, "core.sqlite"), Path.join(dir, "core.sqlite"))
+    Application.put_env(:bezalel, :study_packs_dir, dir)
+
+    on_exit(fn ->
+      Application.put_env(:bezalel, :study_packs_dir, fixtures)
+      File.rm_rf!(dir)
+    end)
+  end
+
+  test "without the notes pack the variant and quotation hints are left out, the rest kept" do
+    assert {:ok, {:details, text, result}} =
+             LookupVerse.run(%{"reference" => "Psalm 40:6"}, %{})
+
+    refute text =~ "get_textual_variant"
+    assert text =~ "`get_cross_references` (reference='Psalm 40:6')"
+    assert %{variant_cases: [], quotations: []} = result.hints
+
+    assert {:ok, {:details, torah, _}} = LookupVerse.run(%{"reference" => "Exodus 31:2"}, %{})
+    assert torah =~ "`get_torah_weave` (reference='Exodus 31:2')"
   end
 end
