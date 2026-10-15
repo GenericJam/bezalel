@@ -22,6 +22,20 @@ defmodule Bezalel.App do
     # for those specific hostnames here too. Both paths compose.
     Mob.DNS.configure_pure_beam()
 
+    # The emulator (and some networks) drop outbound UDP :53, so pure DNS
+    # can't find the sign-in token endpoints: seed them through the platform
+    # resolver.
+    for host <- ~w(api.anthropic.com auth.openai.com chatgpt.com),
+        do: Mob.DNS.resolve(host)
+
+    :ok = Bezalel.Certs.install!()
+
+    # rho (models, sign-in, usage). Mob doesn't start a dep's Applications
+    # on device, so the HTTP stack is started first. No agent tools yet:
+    # replies are still scripted (Bezalel.Agent).
+    {:ok, _} = Application.ensure_all_started(:req_llm)
+    {:ok, _} = Rho.Supervisor.start_link(tools: [])
+
     {:ok, _} = Application.ensure_all_started(:ecto_sqlite3)
     {:ok, _} = Bezalel.Repo.start_link()
 

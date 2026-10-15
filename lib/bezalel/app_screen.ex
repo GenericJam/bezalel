@@ -7,11 +7,12 @@ defmodule Bezalel.AppScreen do
   """
   use Mob.Screen
 
-  alias Bezalel.{Library, Settings}
+  alias Bezalel.{Account, Library, Settings}
   alias Bezalel.Views.{Conversations, Helpers, Sheets, Study, Workshop}
   alias Bezalel.Views.Settings, as: SettingsView
   alias Mob.Theme.AdaptiveWatcher
   alias MobBezalel.{Palette, UI}
+  alias Rho.Auth.Login
 
   @tabs [
     {:study, "Study", :study},
@@ -27,6 +28,12 @@ defmodule Bezalel.AppScreen do
     # System mode: re-set the theme on an OS light/dark flip so this screen
     # repaints in the new palette (the watcher updates the theme only).
     Mob.Device.subscribe(:appearance)
+    # Sign-ins, API keys and usage change from here and from model calls:
+    # Settings follows both. A sign-in started before this screen
+    # (re)started reports here from now on.
+    :ok = Rho.Auth.subscribe()
+    :ok = Rho.Usage.subscribe()
+    login = Login.pending()
 
     conversation = Library.get_conversation(Settings.conversation_id()) || Library.seed!()
 
@@ -36,7 +43,11 @@ defmodule Bezalel.AppScreen do
         mode: mode,
         cover: Settings.cover(),
         model_id: Settings.model(),
-        signed_in: Settings.signed_in?(),
+        account: Account.status(),
+        usage: Account.usage(),
+        login: login,
+        login_code: "",
+        key_drafts: %{},
         sheet: nil,
         toast: nil,
         draft: "",
@@ -191,6 +202,17 @@ defmodule Bezalel.AppScreen do
 
   def handle_info({:change, :desc, value}, socket),
     do: {:noreply, Mob.Socket.assign(socket, :desc, value)}
+
+  def handle_info({:change, {:settings, field}, value}, socket),
+    do: {:noreply, SettingsView.change(field, value, socket)}
+
+  def handle_info({:rho_auth, :changed}, socket), do: {:noreply, SettingsView.refresh(socket)}
+
+  def handle_info({:rho_usage, :changed}, socket),
+    do: {:noreply, SettingsView.refresh_usage(socket)}
+
+  def handle_info({:rho_login, provider, result}, socket),
+    do: {:noreply, SettingsView.login_result(provider, result, socket)}
 
   def handle_info({:build_step, i}, socket), do: {:noreply, Workshop.step(i, socket)}
 

@@ -1,7 +1,9 @@
 defmodule Bezalel.Settings do
   @moduledoc """
   The user's choices, kept in `Mob.State` (survives restarts): theme mode,
-  cover, model, sign-in, and which conversation is open.
+  cover, model (a `Bezalel.Models` id), and which conversation is open.
+  Sign-ins and API keys aren't here: rho keeps them in the secure store
+  (`Rho.Auth`).
   """
 
   @modes [:light, :dark, :night, :system]
@@ -24,16 +26,12 @@ defmodule Bezalel.Settings do
   @spec model() :: String.t()
   def model, do: Mob.State.get(:bezalel_model, Bezalel.Models.default())
 
-  @spec signed_in?() :: boolean()
-  def signed_in?, do: Mob.State.get(:bezalel_signed_in, false)
-
   @spec conversation_id() :: integer() | nil
   def conversation_id, do: Mob.State.get(:bezalel_conversation, nil)
 
   def put_mode(mode) when mode in @modes, do: Mob.State.put(:bezalel_mode, mode)
   def put_cover(cover) when cover in @covers, do: Mob.State.put(:bezalel_cover, cover)
   def put_model(id) when is_binary(id), do: Mob.State.put(:bezalel_model, id)
-  def put_signed_in(value) when is_boolean(value), do: Mob.State.put(:bezalel_signed_in, value)
   def put_conversation_id(id), do: Mob.State.put(:bezalel_conversation, id)
 
   @doc "The theme module for a mode."

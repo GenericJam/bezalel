@@ -17,4 +17,17 @@ Ecto.Migrator.run(Bezalel.Repo, Application.app_dir(:bezalel, "priv/repo/migrati
 {:ok, _} = Mob.State.start_link()
 {:ok, _} = Mob.Device.start_link()
 
+# rho with in-memory sign-ins and a browser that only records the URL
+# (config/test.exs); usage.json lands in the temp data dir.
+Bezalel.Test.MemoryStore.start()
+Bezalel.Test.Browser.start()
+# The sign-in listener on a free port, not the providers' fixed ones (an
+# omp or a dev app on this machine may hold 54545 / 1455).
+redirect = fn provider ->
+  %URI{path: path} = provider |> Rho.Auth.OAuthFlow.default_redirect() |> URI.parse()
+  "http://localhost:0" <> path
+end
+
+{:ok, _} = Rho.Supervisor.start_link(tools: [], login: [redirect: redirect])
+
 ExUnit.start()

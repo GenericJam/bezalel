@@ -17,7 +17,7 @@ defmodule Bezalel.Views.Study do
   @doc "The Study body: the scrolling conversation and the composer under it."
   def render(assigns) do
     model = Models.get(assigns.model_id)
-    rows = Enum.map(assigns.messages, &message(&1, assigns, model))
+    rows = Enum.map(assigns.messages, &message(&1, assigns))
     draft_change = {self(), :draft}
     send_tap = {self(), {:study, :send}}
     build_tap = {self(), {:study, :build_from_chat}}
@@ -119,7 +119,7 @@ defmodule Bezalel.Views.Study do
     """
   end
 
-  defp message(%{role: :user} = m, assigns, _model) do
+  defp message(%{role: :user} = m, assigns) do
     ~MOB"""
     <Column gap={6} fill_width={true}>
       {UI.user_bubble(m.text)}
@@ -130,14 +130,14 @@ defmodule Bezalel.Views.Study do
     """
   end
 
-  defp message(%{role: :agent} = m, assigns, current_model) do
+  defp message(%{role: :agent} = m, assigns) do
     blocks = Enum.map(m.blocks, &block(m, &1, assigns.expanded))
 
     ~MOB"""
     <Column gap={8} fill_width={true}>
       {blocks}
       {passage(m.passage)}
-      {image(m, current_model)}
+      {image(m)}
       {actions(m, assigns, Models.attribution(m.model))}
     </Column>
     """
@@ -199,20 +199,14 @@ defmodule Bezalel.Views.Study do
     )
   end
 
-  defp image(%{image: nil}, _model), do: []
+  defp image(%{image: nil}), do: []
 
-  defp image(%{image: subject}, model) do
-    if Models.draws?(model), do: drawing(subject, model), else: no_drawing(model)
-  end
-
-  defp drawing(subject, model) do
+  # No model draws here yet: an image request shows its placeholder and
+  # says so, whatever the chosen model.
+  defp image(%{image: subject}) do
     caption = "#{subject}, Ex 37:17–24"
     mark = Icons.mark(64, :border, cutout: :surface)
-
-    note =
-      if Agent.live?(),
-        do: "Drawn by #{model.name} · beaten gold, almond-blossom cups, seven lamps",
-        else: "#{model.name} draws this once a model is connected"
+    note = "Images are display-only for now: no model draws them here yet."
 
     ~MOB"""
     <Column gap={8} fill_width={true}>
@@ -232,27 +226,6 @@ defmodule Bezalel.Views.Study do
       <Text text={note} text_size={12} text_color={:muted} />
     </Column>
     """
-  end
-
-  defp no_drawing(model) do
-    text =
-      "#{model.name} doesn’t draw images. Switch to Gemini Pro to see this one; the conversation stays put."
-
-    UI.card(
-      [
-        ~MOB(<Text text={text} text_size={14} line_height={1.5} text_color={:on_surface} />),
-        UI.pill_button(
-          "Switch to Gemini Pro",
-          {self(), {:study, :draw_with_image_model}},
-          :outline,
-          height: 36,
-          fill: false,
-          text_size: 13
-        )
-      ],
-      padding: 14,
-      gap: 10
-    )
   end
 
   defp actions(m, assigns, model_name) do
@@ -426,11 +399,6 @@ defmodule Bezalel.Views.Study do
       "A sermon outline helper for #{passage_ref(socket.assigns.messages)}: big idea, three movements, an illustration for each."
 
     {:noreply, socket |> Socket.assign(desc: desc, build: nil) |> Helpers.go(:workshop)}
-  end
-
-  def handle(:draw_with_image_model, socket) do
-    Bezalel.Settings.put_model("gemini")
-    {:noreply, Socket.assign(socket, model_id: "gemini", switched: true)}
   end
 
   @doc """

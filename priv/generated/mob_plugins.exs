@@ -3,8 +3,8 @@
 # The activated plugins' tier-3/4 contributions, read at boot by Mob.Plugins.
 # Regenerated whenever `config :mob, :plugins` changes (the deploy/regen hook).
 %{
-  nifs: [],
-  plugins: [],
+  nifs: [:mob_secure_store_nif],
+  plugins: [:mob_secure_store],
   styles: [%{name: :mob_bezalel, theme: MobBezalel.Dark}],
   default_style: :mob_bezalel,
   settings: [],

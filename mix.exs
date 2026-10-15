@@ -7,6 +7,7 @@ defmodule Bezalel.MixProject do
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: false,
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       aliases: aliases(),
       erlc_paths: ["src"],
@@ -17,6 +18,9 @@ defmodule Bezalel.MixProject do
   def application do
     [extra_applications: [:logger]]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
     [
@@ -29,6 +33,14 @@ defmodule Bezalel.MixProject do
       # The design plugin (style package): Bezalel's themes, palette, fonts.
       {:mob_bezalel, path: "../mob_bezalel"},
       {:ecto_sqlite3, "~> 0.18"},
+      # The agent core: models, sign-in, usage. A path dep while rho and
+      # Bezalel move together; it moves to Hex once rho is published.
+      {:rho, path: "../rho"},
+      # The platform secure store (Keychain / Keystore) rho keeps the
+      # sign-ins and API keys in. Unreleased: a path dep until it's on Hex.
+      {:mob_secure_store, path: "../mob_secure_store"},
+      # The CA bundle Bezalel.Certs loads (phones have none OTP can find).
+      {:castore, "~> 1.0"},
       # Code quality — Credo + ex_slop (catches AI-generated patterns
       # like blanket rescue, narrator docs, redundant Enum chains, etc).
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

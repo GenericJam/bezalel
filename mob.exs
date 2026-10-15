@@ -44,7 +44,12 @@ config :mob_dev,
 # its native code, permissions, and any demo screens at build time. Drop a name
 # here to deactivate a plugin without removing the dep; remove both to drop it
 # entirely (the native build shrinks and a clean rebuild prunes its artifacts).
-config :mob, :plugins, []
+config :mob, :plugins, [:mob_secure_store]
+
+# mob_secure_store (the Keychain / Keystore rho keeps sign-ins and API keys
+# in) isn't released, so its checkout is unsigned: build it anyway. Once it's
+# on Hex, drop this and add it to :trusted_plugins below.
+config :mob, :acknowledge_unsafe_plugins, [:mob_secure_store]
 
 # Style packages: the app's look. mob_bezalel is the Bezalel design plugin
 # (themes, palette, fonts); boot applies its default, MobBezalel.Dark.

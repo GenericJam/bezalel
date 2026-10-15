@@ -74,12 +74,34 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 - Data: `Bezalel.Library` (SQLite: conversations, messages, tools; seeds the
   design's Exodus 31 study on first run). Preferences: `Bezalel.Settings`
   (`Mob.State`). Scripture and lexicon: `Bezalel.Scripture` (Exodus 31
-  sample). Models: `Bezalel.Models`.
+  sample). Models: `Bezalel.Models` (rho's catalog for the providers the
+  user has access to; a model id is its req_llm spec). Sign-ins, API keys
+  and token usage: `Bezalel.Account`, over rho.
+- **rho** (`../rho`, a path dep until it's on Hex) is the agent core:
+  `Rho.Supervisor` starts in `Bezalel.App.on_start`, configured in
+  `config/config.exs` (`config :rho`: data dir from `Mob.data_dir/0`, the
+  secure store, `Mob.Device.open_url/1`, app name and hints). Read rho's
+  README and AGENTS.md for its seams.
+- **mob_secure_store** (`../mob_secure_store`, unreleased) keeps the
+  sign-ins and API keys in the Keychain / Keystore. It's activated in
+  `mob.exs` with `:acknowledge_unsafe_plugins` until it's signed; it has a
+  NIF, so adding or changing it needs `mix mob.deploy --native`. The iOS
+  simulator's Keychain needs `ios/simulator_entitlements.plist` (linked by
+  `ios/build.zig`); change its bundle id along with the app's.
+- Signing in during development: Settings → Account. "Sign in" opens the
+  provider's page in the phone's browser; it comes back to a listener on
+  localhost inside the app (Claude: port 54545; ChatGPT: 1455). If Claude's
+  page shows a code instead, paste it into the field under Claude and tap
+  "Use code". Or paste an API key (Anthropic, OpenAI, Gemini) and Save; a
+  key replaces a sign-in to the same provider. On the host, tests use an
+  in-memory store and a fake browser (`test/support/fakes.ex`, set in
+  `config/test.exs`); they never reach the network.
 - The agent and the tool builder are seams: `Bezalel.Agent` and
   `Bezalel.Workshop` behaviours, picked by `config :bezalel, :agent` /
   `:builder`. Today both are the design's storyboard (scripted replies; the
   builder makes only the sermon outline and says so for anything else).
-  Settings tells the user replies are scripted; sign-in says it isn't built.
+  Settings tells the user replies are scripted until the agent runs on rho
+  (bezalel-y77.1); sign-in, API keys, the model list and usage are real.
   A real model plugs in behind those behaviours, not in the views.
 - To try an unreleased mob fix here first, point the dep at the checkout
   (`{:mob, path: "../mob", override: true}`) and set `mob_dir` to it in the

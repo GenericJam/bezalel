@@ -43,7 +43,7 @@ defmodule Bezalel.Views.Sheets do
 
   defp content(:models, assigns) do
     groups =
-      for {group, models} <- Models.groups() do
+      for {group, models} <- Models.groups(assigns.account) do
         rows = Enum.map(models, &model_row(&1, assigns.model_id))
 
         ~MOB"""
@@ -67,7 +67,7 @@ defmodule Bezalel.Views.Sheets do
         <Text text="Switch anytime; the chat stays" text_size={12} text_color={:muted} />
       </Row>
       """
-      | groups
+      | if(groups == [], do: [no_models()], else: groups)
     ]
   end
 
@@ -192,5 +192,14 @@ defmodule Bezalel.Views.Sheets do
     if Bezalel.Agent.live?(),
       do: "Ask #{model.name} about #{w.translit}",
       else: "Ask about #{w.translit}"
+  end
+
+  defp no_models do
+    ~MOB(<Text
+  text="No models yet. Sign in with Claude or ChatGPT, or add an API key, in Settings → Account."
+  text_size={14}
+  line_height={1.5}
+  text_color={:muted}
+/>)
   end
 end

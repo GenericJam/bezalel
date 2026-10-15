@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Simulator builds only (ios/build.zig links it into __TEXT,__entitlements,
+     Xcode's "simulated entitlements"): without them the simulator's Keychain
+     refuses mob_secure_store with errSecMissingEntitlement (-34018), so no
+     sign-in or API key could be kept. Device builds are signed with the
+     entitlements mob_dev makes from the provisioning profile instead. Not
+     named *.entitlements on purpose: mob_dev signs device builds with the
+     first ios/*.entitlements it finds. -->
+<plist version="1.0">
+<dict>
+    <key>application-identifier</key>
+    <string>com.example.bezalel</string>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>com.example.bezalel</string>
+    </array>
+</dict>
+</plist>
