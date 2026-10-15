@@ -111,16 +111,55 @@ defmodule Bezalel.Library do
 
   # ── Messages ──────────────────────────────────────────────────────────────
 
-  @doc "A conversation's messages in order, read off its session's active branch."
+  # The messages last read or written, per process (the screen's, in the
+  # app): one session's, with the file's size, mtime and inode when they
+  # were read. A session only grows, so any write (a loop's too, which
+  # Bezalel doesn't see) changes the size and the next read decodes the
+  # file again; Bezalel's own writes leave the messages of the branch they
+  # made. Edits always read the file: they need the entries, not the
+  # messages.
+  @memo {__MODULE__, :shown}
+
+  @doc """
+  A conversation's messages in order, read off its session's active
+  branch. Reading them again before the session changes doesn't decode
+  the file again (the last session read or written in this process is
+  remembered).
+  """
   @spec messages(integer()) :: [Message.t()]
   def messages(conversation_id) do
     case get_conversation(conversation_id) do
-      %Conversation{session_file: file} = c when is_binary(file) ->
-        {session, branch} = open(c, Models.default())
-        Transcript.messages(branch, session.id)
+      %Conversation{session_file: file} = c when is_binary(file) -> shown(c)
+      _ -> []
+    end
+  end
+
+  defp shown(%Conversation{} = c) do
+    path = session_path(c)
+    # Before reading: a write during the read makes the next look miss.
+    stamp = stamp(path)
+
+    case Process.get(@memo) do
+      {^path, ^stamp, messages} when stamp != nil ->
+        messages
 
       _ ->
-        []
+        {session, branch} = open(c, Models.default())
+        remember(path, stamp, Transcript.messages(branch, session.id))
+    end
+  end
+
+  defp remember(_path, nil, messages), do: messages
+
+  defp remember(path, stamp, messages) do
+    Process.put(@memo, {path, stamp, messages})
+    messages
+  end
+
+  defp stamp(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, %File.Stat{size: size, mtime: mtime, inode: inode}} -> {size, mtime, inode}
+      {:error, _} -> nil
     end
   end
 
@@ -130,13 +169,7 @@ defmodule Bezalel.Library do
   """
   @spec touch(integer()) :: :ok
   def touch(conversation_id) do
-    count = length(messages(conversation_id))
-
-    Repo.update_all(from(c in Conversation, where: c.id == ^conversation_id),
-      set: [message_count: count, updated_at: DateTime.utc_now()]
-    )
-
-    :ok
+    shelve(conversation_id, length(messages(conversation_id)), true)
   end
 
   @doc """
@@ -157,10 +190,9 @@ defmodule Bezalel.Library do
 
   # The row is read again: the caller's copy may predate its session.
   defp append(%Conversation{id: id}, entries) do
-    {session, _branch} = open(get_conversation(id), Models.default())
-    _session = Enum.reduce(entries, session, &elem(Session.append(&2, &1), 0))
-    touch(id)
-    {:ok, id |> messages() |> List.last()}
+    {session, branch} = open(get_conversation(id), Models.default())
+    {session, added} = write(session, entries)
+    {:ok, id |> written(session, extend(branch, added), true) |> List.last()}
   end
 
   @doc """
@@ -176,14 +208,14 @@ defmodule Bezalel.Library do
          shown = Transcript.messages(branch, session.id),
          [_ | _] = gone <- Enum.filter(shown, &(&1.id in ids)),
          {parent, copies} <- Transcript.delete(branch, Enum.flat_map(gone, & &1.entries)) do
-      leaf = move(session, parent, copies)
-      recount(conversation_id)
+      {moved, added} = move(session, parent, copies)
+      written(conversation_id, moved, extend(branch, added), false)
 
       {:ok,
        %Undo{
          conversation_id: conversation_id,
          before: session.leaf_id,
-         after: leaf,
+         after: moved.leaf_id,
          messages: gone
        }}
     else
@@ -201,8 +233,9 @@ defmodule Bezalel.Library do
     with %Conversation{session_file: file} = c when is_binary(file) <- get_conversation(id),
          {session, branch} = open(c, Models.default()),
          {parent, copies} <- Transcript.undo(branch, before, after_leaf) do
-      move(session, parent, copies)
-      recount(id)
+      {moved, added} = move(session, parent, copies)
+      # The branch it goes back to isn't the one read: read again.
+      written(id, moved, extend(branch, added), false)
       :ok
     else
       _ -> {:error, :gone}
@@ -220,7 +253,8 @@ defmodule Bezalel.Library do
            get_conversation(conversation_id),
          {session, branch} = open(c, Models.default()),
          {{parent, copies}, text} <- Transcript.take_question(branch) do
-      move(session, parent, copies)
+      {moved, added} = move(session, parent, copies)
+      written(conversation_id, moved, extend(branch, added), false)
       {:ok, text}
     else
       _ -> :none
@@ -238,7 +272,8 @@ defmodule Bezalel.Library do
            get_conversation(conversation_id),
          {session, branch} = open(c, Models.default()),
          {parent, copies} <- Transcript.drop_after_question(branch) do
-      move(session, parent, copies)
+      {moved, added} = move(session, parent, copies)
+      written(conversation_id, moved, extend(branch, added), false)
       :ok
     else
       _ -> :ok
@@ -269,23 +304,86 @@ defmodule Bezalel.Library do
     end
   end
 
-  # Puts the leaf under `parent` and appends `copies`; a marker when there
-  # is nothing to copy. Returns the new leaf.
-  defp move(session, parent, copies) do
-    entries = if copies == [], do: [Transcript.marker()], else: copies
+  # Appends `entries`; returns the session and the entries as written, or
+  # nil for them when the file ended in a torn line (an append joins it, so
+  # neither reads back: what the file holds is read again).
+  defp write(session, entries) do
+    torn? = torn?(session)
 
-    session =
-      Enum.reduce(entries, %{session | leaf_id: parent}, &elem(Session.append(&2, &1), 0))
+    {session, added} =
+      Enum.reduce(entries, {session, []}, fn entry, {s, added} ->
+        {s, entry} = Session.append(s, entry)
+        {s, [entry | added]}
+      end)
 
-    session.leaf_id
+    {session, if(torn?, do: nil, else: Enum.reverse(added))}
   end
 
-  defp recount(conversation_id) do
-    count = length(messages(conversation_id))
+  defp torn?(%Session{written?: false}), do: false
+
+  defp torn?(%Session{path: path}) do
+    with {:ok, %File.Stat{size: size}} when size > 0 <- File.stat(path),
+         {:ok, last} <- File.open(path, [:read, :binary], &:file.pread(&1, size - 1, 1)) do
+      last != {:ok, "\n"}
+    else
+      _ -> false
+    end
+  end
+
+  # Puts the leaf under `parent` and appends `copies`; a marker when there
+  # is nothing to copy.
+  defp move(session, parent, copies) do
+    write(%{session | leaf_id: parent}, if(copies == [], do: [Transcript.marker()], else: copies))
+  end
+
+  # The branch once `added` is appended, as far as the messages go: up to
+  # the first one's parent on `branch`, then `added`. A new session's first
+  # entries follow the model change it starts with, which shows no
+  # message. nil when the parent isn't on `branch` (Undo goes back to
+  # another branch) or what was appended isn't known.
+  defp extend(_branch, nil), do: nil
+
+  defp extend(branch, [first | _] = added) do
+    case {first["parentId"], branch} do
+      {nil, _} ->
+        added
+
+      {_parent, []} ->
+        added
+
+      {parent, branch} ->
+        case Enum.split_while(branch, &(&1["id"] != parent)) do
+          {before, [at | _]} -> before ++ [at | added]
+          {_, []} -> nil
+        end
+    end
+  end
+
+  # After a write: the messages on the new branch (read off the file when
+  # it isn't known), remembered, and the shelf's count; `active?` moves the
+  # conversation to the top.
+  defp written(conversation_id, _session, nil, active?) do
+    messages = conversation_id |> get_conversation() |> shown()
+    shelve(conversation_id, length(messages), active?)
+    messages
+  end
+
+  defp written(conversation_id, session, branch, active?) do
+    messages =
+      remember(session.path, stamp(session.path), Transcript.messages(branch, session.id))
+
+    shelve(conversation_id, length(messages), active?)
+    messages
+  end
+
+  defp shelve(conversation_id, count, active?) do
+    set = if active?, do: [updated_at: DateTime.utc_now()], else: []
 
     Repo.update_all(from(c in Conversation, where: c.id == ^conversation_id),
-      set: [message_count: count]
+      set: [message_count: count] ++ set
     )
+
+    :ok
   end
 
   # ── Tools ─────────────────────────────────────────────────────────────────

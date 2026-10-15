@@ -10,8 +10,12 @@ defmodule Bezalel.Library.Legacy do
 
   Reads and writes the tables with plain SQL on the migration's repo (no
   schemas: these tables are about to change). Idempotent: a conversation
-  that already has a session is left alone, so running it again (after a
-  failed migration, say) moves only what's left.
+  that already has a session is left alone, so running it again moves
+  only what's left. A conversation's session file is named after it
+  (`legacy-<id>.jsonl`), and its first entry writes the file over any
+  there: when a migration fails partway (its transaction rolls the shelf
+  back, or the app is killed), the run after it rewrites the files the
+  failed one left instead of leaving them behind.
   """
 
   alias Bezalel.Library.Transcript
@@ -44,6 +48,7 @@ defmodule Bezalel.Library.Legacy do
       entries ->
         model = Enum.find_value(Enum.reverse(rows), &live_model/1) || Bezalel.Models.default()
         session = Session.new(Session.dir(), model, Rho.Config.data_dir())
+        session = %{session | path: Path.join(Session.dir(), "legacy-#{id}.jsonl")}
         _session = Enum.reduce(entries, session, &elem(Session.append(&2, &1), 0))
 
         repo.query!(

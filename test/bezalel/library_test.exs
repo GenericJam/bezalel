@@ -161,6 +161,78 @@ defmodule Bezalel.LibraryTest do
     assert Library.delete_messages(c.id, ["nope"]) == {:error, :not_found}
   end
 
+  # How many times `fun` reads a session file (`Rho.Session.open/2`), in
+  # this process. The tracer is a process of its own: a process doesn't
+  # receive its own trace messages.
+  defp session_reads(fun) do
+    me = self()
+    tracer = spawn_link(fn -> count_reads(0) end)
+    session = :trace.session_create(:library_reads, tracer, [])
+    1 = :trace.process(session, me, true, [:call])
+    1 = :trace.function(session, {Session, :open, 2}, true, [])
+
+    try do
+      fun.()
+    after
+      ref = :trace.delivered(session, me)
+      receive do: ({:trace_delivered, ^me, ^ref} -> :ok)
+      :trace.session_destroy(session)
+    end
+
+    send(tracer, {:reads, me})
+    receive do: ({:reads, n} -> n)
+  end
+
+  defp count_reads(n) do
+    receive do
+      {:trace, _pid, :call, {Session, :open, _}} -> count_reads(n + 1)
+      {:reads, to} -> send(to, {:reads, n})
+    end
+  end
+
+  test "a store or a delete reads the session once, and the chat's reload doesn't read it again" do
+    c = conversation!()
+    {:ok, _} = Library.add_message(c, %{role: :user, text: "one"})
+    {:ok, two} = Library.add_message(c, %{role: :agent, blocks: [%{"id" => "sum"}]})
+    {:ok, _} = Library.add_message(c, %{role: :user, text: "three"})
+
+    assert session_reads(fn ->
+             {:ok, _} = Library.add_message(c, %{role: :user, text: "four"})
+             :ok = Library.touch(c.id)
+             Library.messages(c.id)
+           end) == 1
+
+    assert session_reads(fn ->
+             {:ok, _} = Library.delete_messages(c.id, [two.id])
+             Library.messages(c.id)
+           end) == 1
+
+    assert texts(c) == ["one", "three", "four"]
+    assert [%{message_count: 3}] = Library.list_conversations()
+
+    # A loop writes the session without Bezalel: the next look reads it.
+    {:ok, session, _} = Library.session(c.id, "anthropic:claude-sonnet-4-5")
+    Session.append(session, Session.user("five"))
+
+    assert session_reads(fn ->
+             :ok = Library.touch(c.id)
+             assert texts(c) == ["one", "three", "four", "five"]
+           end) == 1
+
+    assert [%{message_count: 4}] = Library.list_conversations()
+  end
+
+  test "after a torn last line the chat shows what the file holds, not what was meant to be written" do
+    c = conversation!()
+    {:ok, _} = Library.add_message(c, %{role: :user, text: "one"})
+    File.write!(Library.session_path(c.id), ~s({"type":"mess), [:append])
+
+    # The append joins the torn line: neither reads back.
+    {:ok, _} = Library.add_message(c, %{role: :user, text: "two"})
+    assert texts(c) == ["one"]
+    assert [%{message_count: 1}] = Library.list_conversations()
+  end
+
   describe "a live reply, read back from the session" do
     # What rho's loop writes for a question answered with a tool call that
     # returned a picture and a passage card, then the answer.

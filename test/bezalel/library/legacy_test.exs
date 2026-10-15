@@ -158,4 +158,44 @@ defmodule Bezalel.Library.LegacyTest do
     # One header, the model, four messages: written once.
     assert path |> File.read!() |> String.split("\n", trim: true) |> length() == 6
   end
+
+  test "a move that failed partway leaves no session file behind once it runs again" do
+    # Text no other test's session holds: the sessions directory is shared.
+    tag = "orphan-#{System.unique_integer([:positive])}"
+    first = insert_conversation!("First", "2026-10-02T10:00:00.000000Z")
+    insert_message!(first, 1, role: "user", text: "#{tag} one")
+    broken = insert_conversation!("Broken", "2026-10-01T10:00:00.000000Z")
+    insert_message!(broken, 1, role: "user", text: "#{tag} two")
+    insert_message!(broken, 2, role: "agent", blocks: [%{"id" => "sum"}])
+    Repo.query!("UPDATE messages SET blocks = 'not json' WHERE role = 'agent'")
+
+    migrate = fn ->
+      Ecto.Migrator.run(Repo, @migrations, :up,
+        all: true,
+        dynamic_repo: Repo.get_dynamic_repo(),
+        log: false
+      )
+    end
+
+    holding_tag = fn ->
+      for path <- Path.wildcard(Path.join(Rho.Session.dir(), "*.jsonl")),
+          File.read!(path) =~ tag,
+          do: Path.basename(path)
+    end
+
+    # The first conversation's session was written before the second
+    # failed; the shelf went back to how it was.
+    assert_raise Jason.DecodeError, migrate
+    assert [_written] = holding_tag.()
+
+    {:ok, blocks} = Ecto.Type.adapter_dump(SQLite3, {:array, :map}, [%{"id" => "sum"}])
+    Repo.query!("UPDATE messages SET blocks = ?1 WHERE role = 'agent'", [blocks])
+    migrate.()
+
+    shelf = for id <- [first, broken], do: Library.get_conversation(id).session_file
+    assert Enum.sort(holding_tag.()) == Enum.sort(shelf)
+    assert [%{text: one}] = Library.messages(first)
+    assert [%{text: two}, %{role: :agent}] = Library.messages(broken)
+    assert {one, two} == {"#{tag} one", "#{tag} two"}
+  end
 end
