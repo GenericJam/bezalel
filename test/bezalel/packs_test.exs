@@ -1,5 +1,7 @@
 defmodule Bezalel.PacksTest do
-  use ExUnit.Case, async: true
+  # One test points the global packs dir at its own download, which the async
+  # study tests would then read: not async.
+  use ExUnit.Case, async: false
 
   alias Bezalel.Packs
   alias Bezalel.Packs.Download

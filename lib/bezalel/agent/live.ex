@@ -95,9 +95,16 @@ defmodule Bezalel.Agent.Live do
     :ok
   end
 
+  @doc "Whether a loop is running for the conversation."
+  @spec running?(term()) :: boolean()
+  def running?(conversation_id), do: whereis(conversation_id) != nil
+
+  # The Registry drops a stopped loop's name only when it processes the DOWN,
+  # so just after a release the lookup can still return the dead pid: treat
+  # it as gone (a new start re-registers over a dead holder).
   defp whereis(conversation_id) do
     case Registry.lookup(@registry, conversation_id) do
-      [{pid, _}] -> pid
+      [{pid, _}] -> if Process.alive?(pid), do: pid
       [] -> nil
     end
   end

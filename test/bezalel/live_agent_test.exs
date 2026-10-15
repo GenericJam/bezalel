@@ -54,7 +54,7 @@ defmodule Bezalel.LiveAgentTest do
   defp stream(view), do: assigns(view).streams[assigns(view).conversation.id]
   defp types(blocks), do: Enum.map(blocks, & &1["type"])
   defp block(blocks, type), do: Enum.find(blocks, &(&1["type"] == type))
-  defp loop?(view), do: Registry.lookup(Live, assigns(view).conversation.id) != []
+  defp loop?(view), do: Live.running?(assigns(view).conversation.id)
 
   test "a reply streams into THINKING, a TOOL CALL with its result, the SUMMARY and the passage card, then is stored" do
     script([
