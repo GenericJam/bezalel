@@ -76,8 +76,15 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   built tool), Settings under one top bar and tab bar, plus the sheets and the
   toast. It holds the state; each tab's view and events are in
   `lib/bezalel/views/`. Events are `{:tap, {tab, event}}` tuples routed there.
-- Data: `Bezalel.Library` (SQLite: conversations, messages, tools; seeds the
-  design's Exodus 31 study on first run). Preferences: `Bezalel.Settings`
+- Data: `Bezalel.Library`: each conversation's transcript is its rho
+  session (JSONL in `Rho.Session.dir/0`, read by
+  `Bezalel.Library.Transcript`; Delete and Undo are branch moves), SQLite
+  keeps the shelf (name, kind, kicker, session id and file, message count)
+  and the built tools; seeds the design's Exodus 31 study on first run.
+  Pictures in the chat (a tool's, a model's, an attachment's: image parts
+  in the session) are downscaled on the phone and cached
+  (`Bezalel.Images`, `Bezalel.Views.Images`, with a full-screen viewer).
+  Preferences: `Bezalel.Settings`
   (`Mob.State`). Scripture and lexicon: `Bezalel.Scripture` (Exodus 31
   sample). Models: `Bezalel.Models` (rho's catalog for the providers the
   user has access to; a model id is its req_llm spec). Sign-ins, API keys
@@ -108,10 +115,11 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   `config/test.exs`); they never reach the network.
 - **The agent** (`Bezalel.Agent`): live once the user has a sign-in or an
   API key for any provider. `Bezalel.Agent.Live` runs one rho loop per
-  conversation being answered (study prompt, tier 1 tools, the model from
-  Settings), seeded from the Library (user messages and each reply's
-  SUMMARY) and released when the conversation is left, a message in it is
-  deleted or restored, a reply is stopped or fails, or the screen mounts.
+  conversation being answered (study prompt, the study tools, the model
+  from Settings) on the conversation's session (resumed: the model sees
+  what earlier loops sent and got), released when the conversation is left,
+  before Bezalel writes the session itself (a delete or undo, a question
+  asked again), when a reply is stopped or fails, or the screen mounts.
   Its events stream into `Bezalel.Agent.Reply` (THINKING / TOOL CALL /
   SUMMARY, the passage card from `lookup_verse` / `word_study`'s data,
   `Bezalel.Agent.Card`) in `Bezalel.Views.Study`: stop button while it
@@ -121,13 +129,35 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   Settings and Study say so. Tests drive Live with a scripted model
   (`test/support/fake_llm.ex`, `test/bezalel/live_agent_test.exs`). The
   Workshop builder (`Bezalel.Workshop`) is still the storyboard.
-- **Study packs on a device (dev step, until the download, bezalel-y77.6)**:
-  the tools read `Mob.data_dir()/packs`. Push the core pack (182 MB; the
-  others only if you need them; disk is tight, delete them when done):
-  - Android (debug build): `adb -s <serial> push data/out/core.sqlite /data/local/tmp/ && adb -s <serial> shell "run-as com.example.bezalel mkdir -p files/packs && run-as com.example.bezalel cp /data/local/tmp/core.sqlite files/packs/ && rm /data/local/tmp/core.sqlite"`
-  - iOS simulator: `d=$(xcrun simctl get_app_container <udid> com.example.bezalel data) && mkdir -p "$d/Documents/packs" && cp data/out/core.sqlite "$d/Documents/packs/"`
-    (check `Mob.data_dir()` on the node if the app's data dir differs)
-  - Remove: `run-as com.example.bezalel rm -r files/packs` / `rm -r "$d/Documents/packs"`.
+- **The study library** (`Bezalel.Packs`, `Bezalel.Views.StudyLibrary`):
+  the packs are downloaded from
+  https://bezalel.genericjam.com/packs/manifest.json (`data/README.md`,
+  "Publish") into `Mob.data_dir()/packs`, where the tools read them. On
+  first launch a sheet offers the core pack (26 MB download, 182 MB on the
+  phone); Settings → Study library downloads, updates ("Check for
+  updates") and removes packs, shows storage used, and opens Sources and
+  licences (`Bezalel.AttributionsScreen`, from `data/SOURCES.md`; change
+  both together). `Bezalel.Packs` runs outside the screen: one download at
+  a time, resumed with a Range request after a dropped connection or a
+  restart, both checksums verified, the new file renamed over the old only
+  once it verifies (`Bezalel.Packs.Download`). There is no background
+  keep-alive: iOS suspends the app soon after it leaves the screen and
+  Android may stop it; the download resumes when the app runs again. Host
+  tests serve their own library (`test/support/pack_server.ex`) and never
+  reach the network.
+  - On a dev device the real path is Settings → Study library → Download
+    (or the first-launch sheet).
+  - Shortcut without the network, from a `data/build.sh` build: push
+    `data/out/core.sqlite` (and the others only if you need them; disk is
+    tight, delete them when done). Settings shows it as installed with the
+    version not checked; "Check for updates" hashes it and keeps it if it
+    matches the published one.
+    - Android (debug build): `adb -s <serial> push data/out/core.sqlite /data/local/tmp/ && adb -s <serial> shell "run-as com.example.bezalel mkdir -p files/packs && run-as com.example.bezalel cp /data/local/tmp/core.sqlite files/packs/ && rm /data/local/tmp/core.sqlite"`
+    - iOS simulator: `d=$(xcrun simctl get_app_container <udid> com.example.bezalel data) && mkdir -p "$d/Documents/packs" && cp data/out/core.sqlite "$d/Documents/packs/"`
+      (check `Mob.data_dir()` on the node if the app's data dir differs)
+    - Remove: Settings → Remove for the optional packs; or
+      `run-as com.example.bezalel rm -r files/packs` / `rm -r "$d/Documents/packs"`
+      (core can only be removed this way).
   A native redeploy that reinstalls the app clears its data, packs included.
   Without a pack the tools return an error naming it; the model sees it and
   the reply still lands.

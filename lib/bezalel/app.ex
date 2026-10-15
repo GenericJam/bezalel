@@ -25,10 +25,10 @@ defmodule Bezalel.App do
     Mob.DNS.configure_pure_beam()
 
     # The emulator (and some networks) drop outbound UDP :53, so pure DNS
-    # can't find the sign-in token and model endpoints: seed them through
-    # the platform resolver.
+    # can't find the sign-in token and model endpoints, or the study
+    # library: seed them through the platform resolver.
     for host <-
-          ~w(api.anthropic.com auth.openai.com chatgpt.com api.openai.com generativelanguage.googleapis.com),
+          ~w(api.anthropic.com auth.openai.com chatgpt.com api.openai.com generativelanguage.googleapis.com bezalel.genericjam.com),
         do: Mob.DNS.resolve(host)
 
     :ok = Bezalel.Certs.install!()
@@ -40,6 +40,9 @@ defmodule Bezalel.App do
     {:ok, _} = Application.ensure_all_started(:req_llm)
     {:ok, _} = Rho.Supervisor.start_link(tools: [])
     {:ok, _} = Live.start_link()
+    # The study library: fetches the pack list on first launch, resumes a
+    # download the app was stopped in, and runs downloads outside the screen.
+    {:ok, _} = Bezalel.Packs.start_link()
 
     {:ok, _} = Application.ensure_all_started(:ecto_sqlite3)
     {:ok, _} = Bezalel.Repo.start_link()

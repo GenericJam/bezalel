@@ -1,8 +1,13 @@
 import Config
 
-# Host tests: a throwaway database per run instead of the device's data dir.
+# Host tests: a throwaway database per run instead of the device's data dir
+# (the OS pid keeps concurrent runs, e.g. two checkouts, apart).
 config :bezalel, Bezalel.Repo,
-  database: Path.join(System.tmp_dir!(), "bezalel_test_#{System.unique_integer([:positive])}.db")
+  database:
+    Path.join(
+      System.tmp_dir!(),
+      "bezalel_test_#{System.pid()}_#{System.unique_integer([:positive])}.db"
+    )
 
 # The study tools read the small packs cut by data/scripts/make_fixtures.py,
 # never the real ones in data/out.
@@ -16,3 +21,9 @@ config :logger, level: :warning
 config :rho,
   credential_store: Bezalel.Test.MemoryStore,
   open_url: {Bezalel.Test.Browser, :open, []}
+
+# The study library: nothing fetches the published manifest (the pack
+# tests serve their own, Bezalel.Test.PackServer), and the connection is
+# Wi-Fi unless a test says otherwise (Bezalel.Test.Network).
+config :bezalel, :packs_manifest_url, "http://127.0.0.1:9/packs/manifest.json"
+config :bezalel, :network_state, {Bezalel.Test.Network, :state, []}

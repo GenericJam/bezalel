@@ -1,6 +1,11 @@
 # Host tests run against throwaway state: the Repo on a temp database
 # (config/test.exs), Mob.State on a temp dets file.
-data_dir = Path.join(System.tmp_dir!(), "bezalel_test_#{System.unique_integer([:positive])}")
+data_dir =
+  Path.join(
+    System.tmp_dir!(),
+    "bezalel_test_#{System.pid()}_#{System.unique_integer([:positive])}"
+  )
+
 File.mkdir_p!(data_dir)
 System.put_env("MOB_DATA_DIR", data_dir)
 
@@ -16,6 +21,14 @@ Ecto.Migrator.run(Bezalel.Repo, Application.app_dir(:bezalel, "priv/repo/migrati
 # layer: Mob.Device treats the missing NIF as a host run.
 {:ok, _} = Mob.State.start_link()
 {:ok, _} = Mob.Device.start_link()
+
+# The study library AppScreen subscribes to, on its own empty directory
+# (the tools' fixture packs stay untouched). It fetches nothing by itself;
+# the first-launch offer counts as shown, except in the test about it.
+{:ok, _} =
+  Bezalel.Packs.start_link(dir: Path.join(data_dir, "packs"), auto: false, retry_delays: [0])
+
+Bezalel.Settings.put_packs_offered()
 
 # rho with in-memory sign-ins and a browser that only records the URL
 # (config/test.exs); usage.json lands in the temp data dir.

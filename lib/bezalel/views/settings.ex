@@ -1,9 +1,12 @@
 defmodule Bezalel.Views.Settings do
-  @moduledoc "The Settings tab: account, appearance, model, usage, what's on the phone."
+  @moduledoc """
+  The Settings tab: account, appearance, model, the study library
+  (`Bezalel.Views.StudyLibrary`), usage, what's on the phone.
+  """
   import Mob.Sigil
 
   alias Bezalel.{Account, Agent, Models, Settings}
-  alias Bezalel.Views.Helpers
+  alias Bezalel.Views.{Helpers, StudyLibrary}
   alias Mob.Socket
   alias MobBezalel.{Palette, UI}
   alias Rho.Auth
@@ -59,6 +62,7 @@ defmodule Bezalel.Views.Settings do
       section("Account", account(assigns)),
       section("Appearance", [appearance]),
       section("Model", [model_row(model, assigns.account, models_tap), note(model_note)]),
+      section("Study library", StudyLibrary.render(assigns)),
       section("Token usage", [usage]),
       section("On this phone", [on_phone]),
       section("Design", [

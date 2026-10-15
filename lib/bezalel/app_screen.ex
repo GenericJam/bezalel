@@ -8,7 +8,7 @@ defmodule Bezalel.AppScreen do
   use Mob.Screen
 
   alias Bezalel.{Account, Library, Settings}
-  alias Bezalel.Views.{Conversations, Helpers, Sheets, Study, Workshop}
+  alias Bezalel.Views.{Conversations, Helpers, Sheets, Study, StudyLibrary, Workshop}
   alias Bezalel.Views.Settings, as: SettingsView
   alias Mob.Theme.AdaptiveWatcher
   alias MobBezalel.{Palette, UI}
@@ -37,6 +37,9 @@ defmodule Bezalel.AppScreen do
     # Loops left by an earlier run of this screen answer to nobody now; the
     # next question starts one from the conversation as stored.
     :ok = Bezalel.Agent.release_all()
+    # The study library (Settings, the first-launch offer) follows the
+    # downloads, which run outside this screen.
+    :ok = Bezalel.Packs.subscribe()
 
     conversation = Library.get_conversation(Settings.conversation_id()) || Library.seed!()
 
@@ -69,6 +72,7 @@ defmodule Bezalel.AppScreen do
         move_open: 0
       )
       |> Helpers.open_conversation(conversation)
+      |> StudyLibrary.mount()
 
     {:ok, socket}
   end
@@ -183,6 +187,7 @@ defmodule Bezalel.AppScreen do
   def handle_info({:tap, {:workshop, event}}, socket), do: Workshop.handle(event, socket)
   def handle_info({:tap, {:tool, event}}, socket), do: Workshop.handle_tool(event, socket)
   def handle_info({:tap, {:settings, event}}, socket), do: SettingsView.handle(event, socket)
+  def handle_info({:tap, {:packs, event}}, socket), do: StudyLibrary.handle(event, socket)
 
   # The notice in Study ("Now answering with …") shows after any change of
   # model, whichever tab it was made from, until the conversation changes.
@@ -216,6 +221,9 @@ defmodule Bezalel.AppScreen do
 
   def handle_info({:rho_usage, :changed}, socket),
     do: {:noreply, SettingsView.refresh_usage(socket)}
+
+  def handle_info({:bezalel_packs, event}, socket),
+    do: {:noreply, StudyLibrary.event(event, socket)}
 
   def handle_info({:rho_login, provider, result}, socket),
     do: {:noreply, SettingsView.login_result(provider, result, socket)}

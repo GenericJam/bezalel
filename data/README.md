@@ -214,6 +214,7 @@ The manifest (`schema` 1):
 
 `size`/`sha256` are of the download; `raw_size`/`raw_sha256` of the decompressed
 SQLite file, which the app checks after decompressing. `required` packs (core) are
-fetched on first launch; the others on demand. An app updates when the manifest's
-`data_version` is higher than the one it holds, fetching only packs whose
-`raw_sha256` changed.
+offered on first launch and can't be removed; the others are downloaded on demand.
+On "Check for updates" the app compares the manifest's `data_version` with the one
+each installed pack came from, fetching only packs whose `raw_sha256` changed and
+keeping the old file until the new one verifies (`Bezalel.Packs` in the app).

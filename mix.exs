@@ -47,6 +47,12 @@ defmodule Bezalel.MixProject do
       ),
       # The CA bundle Bezalel.Certs loads (phones have none OTP can find).
       {:castore, "~> 1.0"},
+      # The study-pack downloads (Bezalel.Packs); rho's model calls use it too.
+      {:req, "~> 0.7"},
+      # The local pack server the download tests run against (mob_dev has
+      # them in dev, so :only must include dev too).
+      {:bandit, "~> 1.12", only: [:dev, :test]},
+      {:plug, "~> 1.18", only: [:dev, :test]},
       # Code quality — Credo + ex_slop (catches AI-generated patterns
       # like blanket rescue, narrator docs, redundant Enum chains, etc).
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

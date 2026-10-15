@@ -1,11 +1,13 @@
 defmodule Bezalel.Views.Sheets do
   @moduledoc """
   The bottom sheets: choose a model, confirm a delete, a Hebrew word (the
-  storyboard's, or a word from a live reply's passage card).
+  storyboard's, or a word from a live reply's passage card), the
+  first-launch offer of the core study pack.
   """
   import Mob.Sigil
 
   alias Bezalel.{Models, Scripture}
+  alias Bezalel.Views.StudyLibrary
   alias MobBezalel.UI
 
   @doc "The sheet for `assigns.sheet`, or nothing."
@@ -43,6 +45,8 @@ defmodule Bezalel.Views.Sheets do
     </Sheet>
     """
   end
+
+  defp content(:packs_offer, assigns), do: StudyLibrary.offer(assigns)
 
   defp content(:models, assigns) do
     groups =

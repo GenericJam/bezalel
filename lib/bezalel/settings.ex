@@ -1,7 +1,8 @@
 defmodule Bezalel.Settings do
   @moduledoc """
   The user's choices, kept in `Mob.State` (survives restarts): theme mode,
-  cover, model (a `Bezalel.Models` id), and which conversation is open.
+  cover, model (a `Bezalel.Models` id), which conversation is open, and
+  whether the study-pack download has been offered.
   Sign-ins and API keys aren't here: rho keeps them in the secure store
   (`Rho.Auth`).
   """
@@ -33,6 +34,12 @@ defmodule Bezalel.Settings do
   def put_cover(cover) when cover in @covers, do: Mob.State.put(:bezalel_cover, cover)
   def put_model(id) when is_binary(id), do: Mob.State.put(:bezalel_model, id)
   def put_conversation_id(id), do: Mob.State.put(:bezalel_conversation, id)
+
+  @doc "Has the first-launch offer of the core study pack been shown?"
+  @spec packs_offered?() :: boolean()
+  def packs_offered?, do: Mob.State.get(:bezalel_packs_offered, false) == true
+
+  def put_packs_offered, do: Mob.State.put(:bezalel_packs_offered, true)
 
   @doc "The theme module for a mode."
   @spec theme_module(atom()) :: module()
