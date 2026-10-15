@@ -1,7 +1,8 @@
 defmodule Bezalel.Library.Message do
   @moduledoc """
   A message in a conversation. A user message has `text`. An agent message has
-  `blocks` (each `%{"id", "type", "first", "rest"}`: THINKING, TOOL CALL,
+  `blocks` (each `%{"id", "type", "first", "rest"}`, `"cut" => true` when
+  `first` is cut short and `rest` holds the whole text: THINKING, TOOL CALL,
   SUMMARY), and optionally a cited passage, as a `Bezalel.Scripture` key
   (`passage`, scripted replies) or a card built from the study tools'
   results (`card`, `Bezalel.Agent.Card`, live replies), or a requested

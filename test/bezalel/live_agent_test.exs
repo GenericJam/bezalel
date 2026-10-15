@@ -163,6 +163,71 @@ defmodule Bezalel.LiveAgentTest do
     refute loop?(view)
   end
 
+  test "a message queued as the run hits its iteration limit goes back to the draft" do
+    script([[{:sleep, 300}, @lookup], [{:text, "Status: looked it up."}]])
+
+    Application.put_env(
+      :bezalel,
+      Live,
+      Application.get_env(:bezalel, Live) ++ [max_iterations: 1]
+    )
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    view = view |> ask("And Oholiab?") |> until()
+
+    refute stream(view)
+    refute Helpers.replying?(assigns(view))
+    refute loop?(view)
+    assert assigns(view).draft == "And Oholiab?"
+    refute Enum.any?(assigns(view).messages, &(&1.role == :user and &1.text == "And Oholiab?"))
+    assert block(List.last(assigns(view).messages).blocks, "SUMMARY")["first"] =~ "Status"
+  end
+
+  test "a stop clears a delete's pending release and the loop's session" do
+    script([[{:text, "Partial answer"}, :block]])
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    view = until(view, &match?(%{type: :message_update}, &1))
+    question = List.last(assigns(view).messages)
+    view = render_info(view, {:tap, {:study, {:delete, question.id}}})
+    assert MapSet.member?(assigns(view).stale, assigns(view).conversation.id)
+
+    view = view |> render_info({:tap, {:study, :stop}}) |> until()
+    assert assigns(view).stale == MapSet.new()
+    assert assigns(view).sessions == %{}
+  end
+
+  test "a summary that really ends in an ellipsis keeps it in the next loop's context" do
+    script([[{:text, "Wait for it…\nThe end."}], [{:text, "Again."}]])
+
+    view = AppScreen |> mount_screen() |> ask("First?") |> until()
+    assert_receive {:llm_request, _}
+    assert block(List.last(assigns(view).messages).blocks, "SUMMARY")["first"] == "Wait for it…"
+
+    :ok = Bezalel.Agent.release(assigns(view).conversation.id)
+    _view = view |> ask("Second?") |> until()
+
+    assert_receive {:llm_request, second}
+    texts = for m <- second.messages, part <- m.content, do: part.text
+    assert "Wait for it… The end." in texts
+  end
+
+  test "a long first sentence is cut in its header and kept whole beneath" do
+    long = String.duplicate("word ", 40) <> "end."
+    script([[{:text, long}], [{:text, "Again."}]])
+
+    view = AppScreen |> mount_screen() |> ask("First?") |> until()
+
+    assert %{"cut" => true, "rest" => ^long} =
+             block(List.last(assigns(view).messages).blocks, "SUMMARY")
+
+    :ok = Bezalel.Agent.release(assigns(view).conversation.id)
+    _view = view |> ask("Second?") |> until()
+    assert_receive {:llm_request, _}
+    assert_receive {:llm_request, second}
+    assert long in for(m <- second.messages, part <- m.content, do: part.text)
+  end
+
   test "without a credential for the chosen model, a card points to Settings" do
     MemoryStore.clear()
     :ok = Rho.Auth.put_api_key(:openai, "sk-proj-abcdefghijklmnop1234WXYZ")

@@ -30,7 +30,8 @@ defmodule Bezalel.Agent.Reply do
           card: Card.t() | nil,
           pending: [String.t()],
           retry: String.t() | nil,
-          error: String.t() | nil
+          error: String.t() | nil,
+          reason: atom() | nil
         }
 
   defstruct [
@@ -45,7 +46,8 @@ defmodule Bezalel.Agent.Reply do
     card: nil,
     pending: [],
     retry: nil,
-    error: nil
+    error: nil,
+    reason: nil
   ]
 
   # A header line longer than this (about one line on a phone) is cut; the
@@ -141,7 +143,7 @@ defmodule Bezalel.Agent.Reply do
         true -> :done
       end
 
-    %{r | status: status, retry: nil, summary: join(r.summary, r.text), text: ""}
+    %{r | status: status, reason: reason, retry: nil, summary: join(r.summary, r.text), text: ""}
   end
 
   def apply(r, _event), do: r
@@ -166,9 +168,10 @@ defmodule Bezalel.Agent.Reply do
   end
 
   @doc """
-  The blocks in the design's shape (`%{"id", "type", "first", "rest"}`):
-  each call's THINKING and TOOL CALLs in order, then the SUMMARY (with the
-  text still streaming).
+  The blocks in the design's shape (`%{"id", "type", "first", "rest"}`, plus
+  `"cut" => true` when `first` is a cut-short header and `rest` the whole
+  text): each call's THINKING and TOOL CALLs in order, then the SUMMARY
+  (with the text still streaming).
   """
   @spec blocks(t()) :: [map()]
   def blocks(r) do
@@ -215,9 +218,11 @@ defmodule Bezalel.Agent.Reply do
     %{"id" => item.id, "type" => "TOOL CALL", "first" => call_label(item), "rest" => result(item)}
   end
 
+  # `"cut"` marks a header cut short: `rest` then holds the whole text.
   defp block(id, type, text) do
-    {first, rest} = split(text)
-    %{"id" => id, "type" => type, "first" => first, "rest" => rest}
+    {first, rest, cut?} = split(text)
+    b = %{"id" => id, "type" => type, "first" => first, "rest" => rest}
+    if cut?, do: Map.put(b, "cut", true), else: b
   end
 
   # The header line: the first sentence (or line); a long one is cut and
@@ -230,8 +235,9 @@ defmodule Bezalel.Agent.Reply do
       end
 
     if String.length(sentence) > @first_max,
-      do: {cut(sentence), text},
-      else: {sentence, text |> String.slice(String.length(sentence)..-1//1) |> String.trim()}
+      do: {cut(sentence), text, true},
+      else:
+        {sentence, text |> String.slice(String.length(sentence)..-1//1) |> String.trim(), false}
   end
 
   defp cut(text) do

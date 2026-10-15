@@ -138,7 +138,7 @@ defmodule Bezalel.Agent.Live do
   end
 
   # The Library's messages as session entries: user text, and each reply's
-  # summary (or its card's passage); consecutive ones of a role joined.
+  # summary; consecutive ones of a role joined.
   defp seed(session, messages) do
     messages
     |> Enum.map(&{&1.role, seed_text(&1)})
@@ -167,9 +167,8 @@ defmodule Bezalel.Agent.Live do
   end
 
   # A block whose header was cut repeats the whole text under it.
-  defp summary_text(%{"first" => first, "rest" => rest}) do
-    if String.ends_with?(first, "…"), do: rest, else: first <> " " <> rest
-  end
+  defp summary_text(%{"cut" => true, "rest" => rest}), do: rest
+  defp summary_text(%{"first" => first, "rest" => rest}), do: first <> " " <> rest
 
   defp use_model(loop, model) do
     if Loop.config(loop).session.model == model,

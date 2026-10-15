@@ -469,8 +469,7 @@ defmodule Bezalel.Views.Study do
     if Reply.running?(socket.assigns.streams[cid]) do
       {:noreply, socket}
     else
-      :ok = Agent.release(cid)
-      {:noreply, socket |> drop_stream(cid) |> respond()}
+      {:noreply, socket |> release(cid) |> drop_stream(cid) |> respond()}
     end
   end
 
@@ -676,9 +675,8 @@ defmodule Bezalel.Views.Study do
     model = Helpers.model(socket)
     replying = Map.update(socket.assigns.replying, conversation_id, 1, &(&1 + 1))
     # A loop left from before a sign-out would miss the scripted replies.
-    :ok = Agent.release(conversation_id)
-
     socket
+    |> release(conversation_id)
     |> Socket.assign(:replying, replying)
     |> Socket.start_async({:reply, conversation_id, make_ref()}, fn ->
       {model.id, Storyboard.reply(messages, model)}
@@ -726,7 +724,7 @@ defmodule Bezalel.Views.Study do
   """
   def agent_event(session_id, event, socket) do
     with cid when cid != nil <- socket.assigns.sessions[session_id],
-         %Reply{status: :running} = reply <- socket.assigns.streams[cid] do
+         %Reply{status: :running, session_id: ^session_id} = reply <- socket.assigns.streams[cid] do
       on_event(cid, reply, event, socket)
     else
       _ -> socket
@@ -763,23 +761,31 @@ defmodule Bezalel.Views.Study do
     |> reload_if_open(cid)
   end
 
-  defp finish(socket, cid, %Reply{status: :done} = reply) do
-    socket = store(socket, cid, reply)
+  # Messages sent as the run was ending: after a normal end the loop runs
+  # them next, as a new run; at its limits (`:max_iterations`, `:cost_cap`)
+  # it drops them, so they go back. A message steered in after the limit's
+  # end may have started a run the screen won't follow: the loop goes too.
+  defp finish(socket, cid, %Reply{status: :done, reason: reason} = reply)
+       when reply.pending == [] or reason in [:max_iterations, :cost_cap] do
+    socket = socket |> store(cid, reply) |> drop_stream(cid)
 
-    if reply.pending == [] do
-      socket |> drop_stream(cid) |> release_if_unused(cid)
-    else
-      # Sent as the run was ending: the loop runs them next, as a new run.
-      put_stream(socket, cid, %{Reply.continue(reply, "") | pending: reply.pending})
-    end
+    socket =
+      if reply.pending == [], do: release_if_unused(socket, cid), else: release(socket, cid)
+
+    unsend(socket, cid, reply.pending)
+  end
+
+  defp finish(socket, cid, %Reply{status: :done} = reply) do
+    socket
+    |> store(cid, reply)
+    |> put_stream(cid, %{Reply.continue(reply, "") | pending: reply.pending})
   end
 
   # Stopped: what streamed is kept. The loop goes (its session holds the
   # cut-off turn); the next question starts one from the conversation.
   defp finish(socket, cid, %Reply{status: :stopped} = reply) do
-    :ok = Agent.release(cid)
-
     socket
+    |> release(cid)
     |> store(cid, reply)
     |> drop_stream(cid)
     |> unsend(cid, reply.pending)
@@ -788,9 +794,8 @@ defmodule Bezalel.Views.Study do
   # Failed: the error stays in the conversation, with Try again (a fresh
   # loop from the conversation as stored).
   defp finish(socket, cid, %Reply{status: :error} = reply) do
-    :ok = Agent.release(cid)
-
     socket
+    |> release(cid)
     |> put_stream(cid, %{reply | pending: []})
     |> unsend(cid, reply.pending)
   end
@@ -852,23 +857,24 @@ defmodule Bezalel.Views.Study do
   # The loop of a conversation that's no longer open, or whose messages
   # changed while it ran, goes once its reply is done.
   defp release_if_unused(socket, cid) do
-    if cid != socket.assigns.conversation.id or MapSet.member?(socket.assigns.stale, cid) do
-      :ok = Agent.release(cid)
-      Socket.assign(socket, :stale, MapSet.delete(socket.assigns.stale, cid))
-    else
-      socket
-    end
+    if cid != socket.assigns.conversation.id or MapSet.member?(socket.assigns.stale, cid),
+      do: release(socket, cid),
+      else: socket
   end
 
   # A message deleted or put back: the agent's context no longer matches
   # the conversation, so its loop goes (now, or when its reply is done).
   defp forget(socket, cid) do
-    if Reply.running?(socket.assigns.streams[cid]) do
-      Socket.assign(socket, :stale, MapSet.put(socket.assigns.stale, cid))
-    else
-      :ok = Agent.release(cid)
-      socket
-    end
+    if Reply.running?(socket.assigns.streams[cid]),
+      do: Socket.assign(socket, :stale, MapSet.put(socket.assigns.stale, cid)),
+      else: release(socket, cid)
+  end
+
+  # The conversation's loop goes, and with it its sessions and stale mark.
+  defp release(socket, cid) do
+    :ok = Agent.release(cid)
+    sessions = Map.reject(socket.assigns.sessions, fn {_, c} -> c == cid end)
+    Socket.assign(socket, sessions: sessions, stale: MapSet.delete(socket.assigns.stale, cid))
   end
 
   # A reply starting (a new one, or the next after a steer) opens its
@@ -937,9 +943,8 @@ defmodule Bezalel.Views.Study do
   end
 
   # A cut header repeats the whole text under it.
-  defp summary_text(%{"first" => first, "rest" => rest}) do
-    if String.ends_with?(first, "…"), do: rest, else: String.trim(first <> " " <> rest)
-  end
+  defp summary_text(%{"cut" => true, "rest" => rest}), do: rest
+  defp summary_text(%{"first" => first, "rest" => rest}), do: String.trim(first <> " " <> rest)
 
   defp passage_ref(messages) do
     Enum.find_value(messages, "this passage", fn m ->
