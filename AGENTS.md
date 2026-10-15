@@ -42,7 +42,7 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   `design/`. `Bezalel Core Screens v2.dc.html` is the screen spec;
   `Bezalel Brand.dc.html` the brand. The `_ds/organic-…` system attached to the
   project is not used.
-- The look comes from the **mob_bezalel** style package (`../mob_bezalel`,
+- The look comes from the **mob_bezalel** style package (GenericJam/mob_bezalel,
   activated in `mob.exs`): themes, `MobBezalel.Palette` for colors with no
   theme slot, font tokens (`font: :display`, `:scripture`, `:hebrew`, …), and
   `MobBezalel.UI` composites (bars, cards, pills, segmented control, blocks,
@@ -67,6 +67,11 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 
 ## The app
 
+- rho, mob_secure_store and mob_bezalel are GitHub deps pinned to commits in
+  `mix.exs` (`sibling/3`), so a fresh clone builds. To work on one alongside
+  the app, run with `BEZALEL_LOCAL_DEPS=1` (uses `../rho`, `../mob_secure_store`,
+  `../mob_bezalel`), and bump the pinned commit once the change is pushed.
+
 - `Bezalel.AppScreen` is the whole app: Study, Conversations, Workshop (and a
   built tool), Settings under one top bar and tab bar, plus the sheets and the
   toast. It holds the state; each tab's view and events are in
@@ -82,12 +87,12 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   system prompt (`Bezalel.Study.Prompt`); the live agent runs them. How
   they were ported, the pack access, the fixtures and the differences from
   studybible-mcp: `docs/study_tools.md`.
-- **rho** (`../rho`, a path dep until it's on Hex) is the agent core:
+- **rho** (GenericJam/rho, pinned to a commit until it's on Hex) is the agent core:
   `Rho.Supervisor` starts in `Bezalel.App.on_start`, configured in
   `config/config.exs` (`config :rho`: data dir from `Mob.data_dir/0`, the
   secure store, `Mob.Device.open_url/1`, app name and hints). Read rho's
   README and AGENTS.md for its seams.
-- **mob_secure_store** (`../mob_secure_store`, unreleased) keeps the
+- **mob_secure_store** (GenericJam/mob_secure_store, unreleased, pinned) keeps the
   sign-ins and API keys in the Keychain / Keystore. It's activated in
   `mob.exs` with `:acknowledge_unsafe_plugins` until it's signed; it has a
   NIF, so adding or changing it needs `mix mob.deploy --native`. The iOS

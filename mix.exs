@@ -31,16 +31,20 @@ defmodule Bezalel.MixProject do
       # release builds (MOB-476, MOB-480).
       {:mob_dev, "~> 0.7.25", only: :dev, runtime: false},
       # The design plugin (style package): Bezalel's themes, palette, fonts.
-      {:mob_bezalel, path: "../mob_bezalel"},
+      sibling(:mob_bezalel, "GenericJam/mob_bezalel", "9dbf917e9f86ee81d997b85f225ef2209c741c17"),
       {:ecto_sqlite3, "~> 0.18"},
       # The study packs are read with Exqlite directly (Bezalel.Study.DB).
       {:exqlite, "~> 0.42"},
-      # The agent core: models, sign-in, usage. A path dep while rho and
-      # Bezalel move together; it moves to Hex once rho is published.
-      {:rho, path: "../rho"},
+      # The agent core: models, sign-in, usage. Pinned to a commit until rho
+      # is on Hex.
+      sibling(:rho, "GenericJam/rho", "f07e8e778d2d28dacdf4c6beff74cd6624f5e144"),
       # The platform secure store (Keychain / Keystore) rho keeps the
-      # sign-ins and API keys in. Unreleased: a path dep until it's on Hex.
-      {:mob_secure_store, path: "../mob_secure_store"},
+      # sign-ins and API keys in. Unreleased: pinned to a commit.
+      sibling(
+        :mob_secure_store,
+        "GenericJam/mob_secure_store",
+        "99a94bcbdfb4ed6f57c2286e994f885488e5886a"
+      ),
       # The CA bundle Bezalel.Certs loads (phones have none OTP can find).
       {:castore, "~> 1.0"},
       # Code quality — Credo + ex_slop (catches AI-generated patterns
@@ -66,5 +70,14 @@ defmodule Bezalel.MixProject do
       android: ["mob.deploy --android"],
       "android.native": ["mob.deploy --native --android"]
     ]
+  end
+
+  # A dependency developed alongside Bezalel: GitHub, pinned to a commit, so
+  # a fresh clone builds. BEZALEL_LOCAL_DEPS=1 uses the sibling checkouts
+  # (../rho, ../mob_secure_store, ../mob_bezalel) instead, for working on them.
+  defp sibling(app, repo, ref) do
+    if System.get_env("BEZALEL_LOCAL_DEPS") in ["1", "true"],
+      do: {app, path: "../#{app}", override: true},
+      else: {app, github: repo, ref: ref}
   end
 end
