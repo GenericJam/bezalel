@@ -412,8 +412,8 @@ defmodule Bezalel.Views.Study do
     chips =
       if open?,
         do: [
-          action_chip("Copy", {self(), {:study, {:copy, m.id}}}, :on_surface),
-          action_chip("Delete", {self(), {:study, {:delete, m.id}}}, :error)
+          Helpers.action_chip("Copy", {self(), {:study, {:copy, m.id}}}, :on_surface),
+          Helpers.action_chip("Delete", {self(), {:study, {:delete, m.id}}}, :error)
         ],
         else: []
 
@@ -435,25 +435,6 @@ defmodule Bezalel.Views.Study do
     <Row gap={4} align={:center} fill_width={false}>
       {items}
     </Row>
-    """
-  end
-
-  defp action_chip(label, tap, color) do
-    ~MOB"""
-    <Box
-      background={:surface}
-      border_color={:border}
-      border_width={1}
-      corner_radius={15}
-      height={30}
-      padding_left={12}
-      padding_right={12}
-      align="center"
-      fill_width={false}
-      on_tap={tap}
-    >
-      <Text text={label} font={:ui_medium} text_size={12} text_color={color} />
-    </Box>
     """
   end
 
@@ -954,6 +935,59 @@ defmodule Bezalel.Views.Study do
       end
 
     Socket.assign(socket, :edits, edits)
+  end
+
+  @doc """
+  Lets go of a conversation about to be deleted
+  (`Bezalel.Views.Conversations`), so an Undo of the delete brings it back
+  as the chat showed it: a reply streaming in it is stopped (what
+  streamed is kept in the session, as Stop keeps it, and the messages
+  sent meanwhile that it hadn't taken in are added as questions), its
+  loop goes now, and the message deletes and undos that waited for that
+  reply are made.
+  """
+  def let_go(socket, cid) do
+    reply = socket.assigns.streams[cid]
+    :ok = Agent.stop(cid)
+    pending = if Reply.running?(reply), do: await_stopped(reply.session_id, reply.pending)
+    socket = socket |> drop_stream(cid) |> release(cid)
+    if Reply.running?(reply), do: keep_stopped(cid, pending)
+    socket
+  end
+
+  # A stop answers at once while the model streams; with tools running,
+  # the loop writes their results and ends once they finish. That's
+  # waited for a moment, so the session holds the turn whole; past it the
+  # loop is shut anyway (its next resume closes the open tool calls).
+  # Returns `pending` without the messages the loop took in meanwhile
+  # (events this screen hadn't handled yet): they're in the session. After
+  # an end, what's already queued is read too: a run that ended on its
+  # own may have been followed by one the stop ended.
+  @stop_wait_ms 2_000
+
+  defp await_stopped(session_id, pending, wait \\ @stop_wait_ms) do
+    receive do
+      {:rho, ^session_id, %{type: :agent_end}} ->
+        await_stopped(session_id, pending, 0)
+
+      {:rho, ^session_id, %{type: :message_end, entry: %{"message" => %{"role" => "user"} = m}}} ->
+        await_stopped(session_id, List.delete(pending, Session.typed(m)), wait)
+    after
+      wait -> pending
+    end
+  end
+
+  # What Stop does once the run ends (`finish/3`): the shelf counts the
+  # cut-off turn, and the unsent messages go into the conversation.
+  defp keep_stopped(cid, pending) do
+    :ok = Library.touch(cid)
+
+    with %Library.Conversation{} = conversation <- Library.get_conversation(cid) do
+      for text <- pending,
+          do: {:ok, _} = Library.add_message(conversation, %{role: :user, text: text})
+    end
+
+    :ok
   end
 
   # The conversation's loop goes, and with it its sessions and stale mark;

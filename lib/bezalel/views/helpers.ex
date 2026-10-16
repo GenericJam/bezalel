@@ -1,5 +1,6 @@
 defmodule Bezalel.Views.Helpers do
-  @moduledoc "Socket helpers shared by the tab views."
+  @moduledoc "Socket helpers and pieces shared by the tab views."
+  import Mob.Sigil
 
   alias Bezalel.{Agent, Library, Models, Settings}
   alias Bezalel.Agent.Reply
@@ -43,10 +44,12 @@ defmodule Bezalel.Views.Helpers do
   defp without_stream(messages, _reply), do: messages
 
   @doc """
-  Shows a toast for four seconds. `opts`: `:undo` (what puts a deleted
-  message back: a `Bezalel.Library.Undo`, or `{:pending, conversation_id,
-  message_id}` for a delete still waiting for its conversation's reply),
-  `:ask_again` (offer a fresh reply).
+  Shows a toast for four seconds (`toast_ms/0`). `opts`: `:undo` (what
+  puts back what was deleted: a `Bezalel.Library.Undo`, or `{:pending,
+  conversation_id, message_id}` for a message delete still waiting for its
+  conversation's reply, or `{:conversation, deleted, instead}` for a
+  deleted conversation, `Bezalel.Views.Conversations`), `:ask_again`
+  (offer a fresh reply).
   """
   def toast(socket, text, opts \\ []) do
     ref = make_ref()
@@ -58,6 +61,29 @@ defmodule Bezalel.Views.Helpers do
       undo: Keyword.get(opts, :undo),
       ask_again: Keyword.get(opts, :ask_again, false)
     })
+  end
+
+  @doc "How long a toast shows, in milliseconds: its Undo's window."
+  def toast_ms, do: @toast_ms
+
+  @doc "A chip in a ⋯ menu (Copy, Delete), in `color`."
+  def action_chip(label, tap, color) do
+    ~MOB"""
+    <Box
+      background={:surface}
+      border_color={:border}
+      border_width={1}
+      corner_radius={15}
+      height={30}
+      padding_left={12}
+      padding_right={12}
+      align="center"
+      fill_width={false}
+      on_tap={tap}
+    >
+      <Text text={label} font={:ui_medium} text_size={12} text_color={color} />
+    </Box>
+    """
   end
 
   @doc "The chosen model."

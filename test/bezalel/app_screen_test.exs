@@ -3,7 +3,9 @@ defmodule Bezalel.AppScreenTest do
   # Shares the test database and Mob.State with the other modules' setup.
   @moduletag :screen
 
-  alias Bezalel.{AppScreen, Library, Repo}
+  import Ecto.Query, only: [from: 2]
+
+  alias Bezalel.{AppScreen, Library, Repo, Settings}
   alias Bezalel.Library.{Conversation, Tool, Undo}
   alias Bezalel.Test.MemoryStore
   alias Bezalel.Views.Helpers
@@ -226,5 +228,120 @@ defmodule Bezalel.AppScreenTest do
     view = render_info(view, {:tap, {:tab, :convs}})
     assert text(view) =~ "New study"
     assert text(view) =~ "OPEN"
+  end
+
+  describe "deleting a conversation" do
+    defp study!(name) do
+      {:ok, c} = Library.create_conversation(%{name: name, kicker: "STUDY", kind: "Study"})
+      {:ok, _} = Library.add_message(c, %{role: :user, text: "#{name}?"})
+      Library.get_conversation(c.id)
+    end
+
+    defp shelf(view), do: Enum.map(assigns(view).shelf, & &1.conversation.id)
+
+    # Taps what the screen draws: the row's ⋯, then its Delete chip.
+    defp delete(view, id) do
+      view = view |> tap_node(find(view, :box, id: "conversation-more-#{id}"))
+      tap_node(view, find(view, :box, on_tap: {self(), {:convs, {:delete, id}}}))
+    end
+
+    defp undo(view), do: tap_node(view, find(view, :text, text: "Undo"))
+
+    defp tap_node(view, %{props: %{on_tap: {pid, tag}}}) when pid == self(),
+      do: render_info(view, {:tap, tag})
+
+    # Three studies, John 1 the latest (open at mount), then Psalm 119, Ruth.
+    defp shelf! do
+      ruth = study!("Ruth")
+      psalms = study!("Psalm 119")
+      john = study!("John 1")
+
+      for {c, day} <- [{ruth, 1}, {psalms, 2}, {john, 3}] do
+        at = DateTime.new!(Date.new!(2026, 10, day), ~T[09:00:00.000000])
+        Repo.update_all(from(x in Conversation, where: x.id == ^c.id), set: [updated_at: at])
+      end
+
+      {ruth, psalms, john}
+    end
+
+    test "from its ⋯ menu takes the row off at once, and Undo puts it back in its place" do
+      {ruth, psalms, john} = shelf!()
+      view = AppScreen |> mount_screen() |> render_info({:tap, {:tab, :convs}})
+      assert shelf(view) == [john.id, psalms.id, ruth.id]
+
+      view = delete(view, psalms.id)
+      assert shelf(view) == [john.id, ruth.id]
+      assert assigns(view).toast.text == "Deleted “Psalm 119”"
+      assert assigns(view).conversation.id == john.id
+      assert_renderable(view)
+
+      view = undo(view)
+      assert shelf(view) == [john.id, psalms.id, ruth.id]
+      assert assigns(view).toast == nil
+      assert assigns(view).tab == :convs
+
+      view = render_info(view, {:tap, {:convs, {:open, psalms.id}}})
+      assert [%{text: "Psalm 119?"}] = assigns(view).messages
+    end
+
+    test "the open one opens the latest left; Undo opens it again" do
+      {_ruth, psalms, john} = shelf!()
+      view = AppScreen |> mount_screen() |> render_info({:tap, {:tab, :convs}})
+
+      view = delete(view, john.id)
+      assert assigns(view).conversation.id == psalms.id
+      assert [%{text: "Psalm 119?"}] = assigns(view).messages
+      assert Settings.conversation_id() == psalms.id
+      assert assigns(view).tab == :convs
+
+      view = undo(view)
+      assert assigns(view).conversation.id == john.id
+      assert [%{text: "John 1?"}] = assigns(view).messages
+      assert assigns(view).tab == :convs
+    end
+
+    test "the last one opens a new study; Undo brings it back and the new study goes" do
+      view = AppScreen |> mount_screen() |> render_info({:tap, {:tab, :convs}})
+      seeded = assigns(view).conversation
+
+      view = delete(view, seeded.id)
+      assert %{name: "New study"} = assigns(view).conversation
+      assert assigns(view).messages == []
+      assert [%{conversation: %{name: "New study"}}] = assigns(view).shelf
+
+      view = undo(view)
+      assert assigns(view).conversation.id == seeded.id
+      assert shelf(view) == [seeded.id]
+      assert Library.conversation_count() == 1
+    end
+
+    test "once the Undo window ends it's purged, its session with it, and Undo does nothing" do
+      {ruth, psalms, john} = shelf!()
+      view = AppScreen |> mount_screen() |> render_info({:tap, {:tab, :convs}})
+      view = delete(view, psalms.id)
+
+      assert_receive {:purge, deleted} = purge, Helpers.toast_ms() + 1_000
+      assert deleted.conversation_id == psalms.id
+      assert File.exists?(Library.session_path(psalms))
+      view = render_info(view, purge)
+
+      assert assigns(view).toast == nil
+      refute Repo.get(Conversation, psalms.id)
+      refute File.exists?(Library.session_path(psalms))
+
+      view = render_info(view, {:tap, {:convs, :undo}})
+      assert shelf(view) == [john.id, ruth.id]
+    end
+
+    test "a delete whose Undo was still up when the app closed is purged at the next start" do
+      {_ruth, psalms, _john} = shelf!()
+
+      _view =
+        AppScreen |> mount_screen() |> render_info({:tap, {:tab, :convs}}) |> delete(psalms.id)
+
+      _view = mount_screen(AppScreen)
+      refute Repo.get(Conversation, psalms.id)
+      refute File.exists?(Library.session_path(psalms))
+    end
   end
 end

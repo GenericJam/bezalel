@@ -13,12 +13,17 @@ defmodule Bezalel.Library do
   releases it first, since a loop keeps its own place in the file. How
   the messages are read off the session and what the moves are:
   `Bezalel.Library.Transcript`.
+
+  A deleted conversation leaves the shelf at once but is kept, marked,
+  while its Undo is offered (`delete_conversation/1`, `undelete/1`); then
+  it's purged with its session and the files kept for it (`purge/1`, and
+  `purge_deleted/0` for any a closed app left).
   """
   import Ecto.Query
 
   alias Bezalel.Agent.Storyboard
+  alias Bezalel.{Images, Models, Repo}
   alias Bezalel.Library.{Conversation, Message, Tool, Transcript}
-  alias Bezalel.{Models, Repo}
   alias Rho.Session
 
   defmodule Undo do
@@ -35,6 +40,25 @@ defmodule Bezalel.Library do
     defstruct [:conversation_id, :before, :after, messages: []]
   end
 
+  defmodule Deleted do
+    @moduledoc """
+    A deleted conversation, for its Undo (`Bezalel.Library.undelete/1`) or
+    its purge once the Undo is gone (`Bezalel.Library.purge/1`).
+    `deleted_at` tells this delete from a later one of the same
+    conversation (deleted, put back, deleted again).
+    """
+    @type t :: %__MODULE__{
+            conversation_id: integer(),
+            name: String.t(),
+            deleted_at: DateTime.t()
+          }
+    defstruct [:conversation_id, :name, :deleted_at]
+  end
+
+  # The conversations on the shelf: not the deleted ones waiting for their
+  # purge.
+  defp shelf, do: from(c in Conversation, where: is_nil(c.deleted_at))
+
   # ── Conversations ─────────────────────────────────────────────────────────
 
   @doc """
@@ -45,7 +69,7 @@ defmodule Bezalel.Library do
           %{conversation: Conversation.t(), message_count: non_neg_integer()}
         ]
   def list_conversations(opts \\ []) do
-    from(c in Conversation,
+    from(c in shelf(),
       order_by: [desc: c.updated_at, desc: c.id],
       select: %{conversation: c, message_count: c.message_count}
     )
@@ -54,15 +78,15 @@ defmodule Bezalel.Library do
     |> Repo.all()
   end
 
-  @doc "A conversation by id, or nil."
+  @doc "A conversation on the shelf by id, or nil (also once it's deleted)."
   @spec get_conversation(integer() | nil) :: Conversation.t() | nil
   def get_conversation(nil), do: nil
-  def get_conversation(id), do: Repo.get(Conversation, id)
+  def get_conversation(id), do: Repo.one(from(c in shelf(), where: c.id == ^id))
 
   @doc "The most recently active conversation, or nil when there are none."
   @spec latest_conversation() :: Conversation.t() | nil
   def latest_conversation do
-    Repo.one(from(c in Conversation, order_by: [desc: c.updated_at, desc: c.id], limit: 1))
+    Repo.one(from(c in shelf(), order_by: [desc: c.updated_at, desc: c.id], limit: 1))
   end
 
   @doc "Starts a conversation (its session is created when it's first written)."
@@ -71,9 +95,103 @@ defmodule Bezalel.Library do
     %Conversation{} |> Conversation.changeset(attrs) |> Repo.insert()
   end
 
-  @doc "How many conversations are stored."
+  @doc "How many conversations are on the shelf."
   @spec conversation_count() :: non_neg_integer()
-  def conversation_count, do: Repo.aggregate(Conversation, :count)
+  def conversation_count, do: Repo.aggregate(shelf(), :count)
+
+  @doc """
+  Deletes a conversation: it's off the shelf now (the reads above don't
+  see it, writes to it do nothing) and kept until `purge/1`, so
+  `undelete/1` can put it back as it was. The conversation must have no
+  loop.
+  """
+  @spec delete_conversation(integer()) :: {:ok, Deleted.t()} | {:error, :not_found}
+  def delete_conversation(id) do
+    now = DateTime.utc_now()
+
+    case Repo.one(from(c in shelf(), where: c.id == ^id)) do
+      nil ->
+        {:error, :not_found}
+
+      c ->
+        Repo.update_all(from(x in Conversation, where: x.id == ^id), set: [deleted_at: now])
+        {:ok, %Deleted{conversation_id: id, name: c.name, deleted_at: now}}
+    end
+  end
+
+  @doc """
+  Puts a deleted conversation back on the shelf, where it was (its place
+  is its last activity, which the delete leaves alone). `{:error, :gone}`
+  once it's purged.
+  """
+  @spec undelete(Deleted.t()) :: :ok | {:error, :gone}
+  def undelete(%Deleted{conversation_id: id, deleted_at: at}) do
+    case Repo.update_all(deleted(id, at), set: [deleted_at: nil]) do
+      {1, _} -> :ok
+      {0, _} -> {:error, :gone}
+    end
+  end
+
+  @doc """
+  Purges a deleted conversation: its row, its session file, and what was
+  kept by session under rho's data dir (cached pictures, spilled tool
+  output, the todo list). Nothing when it was put back (or deleted again
+  since: that delete's own purge comes later).
+  """
+  @spec purge(Deleted.t()) :: :ok
+  def purge(%Deleted{conversation_id: id, deleted_at: at}) do
+    id |> deleted(at) |> Repo.all() |> Enum.each(&purge_one/1)
+  end
+
+  @doc """
+  Purges every deleted conversation, at start: a delete whose Undo was
+  still offered when the app closed stays deleted.
+  """
+  @spec purge_deleted() :: :ok
+  def purge_deleted do
+    from(c in Conversation, where: not is_nil(c.deleted_at))
+    |> Repo.all()
+    |> Enum.each(&purge_one/1)
+  end
+
+  @doc """
+  Deletes a conversation for good if nothing was ever written to it (a
+  new study nobody asked anything in); otherwise leaves it.
+  """
+  @spec discard_unwritten(integer()) :: :ok
+  def discard_unwritten(id) do
+    Repo.delete_all(from(c in shelf(), where: c.id == ^id and is_nil(c.session_file)))
+    :ok
+  end
+
+  defp deleted(id, at), do: from(c in Conversation, where: c.id == ^id and c.deleted_at == ^at)
+
+  # The files first: a purge cut short leaves the row, so the next start
+  # finishes it. The paths under rho's data dir are rho's layout
+  # (`Rho.Artifacts`, `Rho.Tools.Todo`), which keep a session id like
+  # rho's own (letters, digits, `-`, `_`) as it is; any other id isn't
+  # made into a path.
+  defp purge_one(%Conversation{} = c) do
+    with path when is_binary(path) <- session_path(c), do: File.rm(path)
+
+    if path_segment?(c.session_id) do
+      data = Rho.Config.data_dir()
+      File.rm_rf(Path.join(Images.dir(), c.session_id))
+      File.rm_rf(Path.join([data, "artifacts", c.session_id]))
+      File.rm(Path.join([data, "todos", c.session_id <> ".json"]))
+    end
+
+    Repo.delete_all(from(x in Conversation, where: x.id == ^c.id))
+    :ok
+  end
+
+  defp path_segment?(id) when is_binary(id) and id != "" do
+    id
+    |> String.to_charlist()
+    |> Enum.all?(&(&1 in ?a..?z or &1 in ?A..?Z or &1 in ?0..?9 or &1 in [?-, ?_]))
+  end
+
+  defp path_segment?(_id), do: false
 
   # ── Sessions ──────────────────────────────────────────────────────────────
 
@@ -102,7 +220,11 @@ defmodule Bezalel.Library do
   def session_path(%Conversation{session_file: file}), do: Path.join(Session.dir(), file)
   def session_path(id), do: id |> get_conversation() |> then(&(&1 && session_path(&1)))
 
-  @doc "The session file of the conversation whose session is `session_id`, or nil."
+  @doc """
+  The session file of the conversation whose session is `session_id`, or
+  nil. A deleted conversation's too, until it's purged: a picture still
+  being made when it was deleted is made all the same, for its Undo.
+  """
   @spec session_path_by_id(String.t()) :: String.t() | nil
   def session_path_by_id(session_id) do
     Repo.one(from(c in Conversation, where: c.session_id == ^session_id, limit: 1))
@@ -379,7 +501,7 @@ defmodule Bezalel.Library do
   defp shelve(conversation_id, count, active?) do
     set = if active?, do: [updated_at: DateTime.utc_now()], else: []
 
-    Repo.update_all(from(c in Conversation, where: c.id == ^conversation_id),
+    Repo.update_all(from(c in shelf(), where: c.id == ^conversation_id),
       set: [message_count: count] ++ set
     )
 
@@ -411,9 +533,21 @@ defmodule Bezalel.Library do
     end
   end
 
-  @doc "Saves a built tool."
+  @doc """
+  Saves a built tool. A conversation it came from that's been purged
+  meanwhile (deleted while the tool was built) isn't recorded.
+  """
   @spec create_tool(map()) :: {:ok, Tool.t()} | {:error, Ecto.Changeset.t()}
-  def create_tool(attrs), do: %Tool{} |> Tool.changeset(attrs) |> Repo.insert()
+  def create_tool(attrs),
+    do: %Tool{} |> Tool.changeset(from_conversation(attrs)) |> Repo.insert()
+
+  defp from_conversation(%{conversation_id: id} = attrs) when is_integer(id) do
+    if Repo.exists?(from(c in Conversation, where: c.id == ^id)),
+      do: attrs,
+      else: %{attrs | conversation_id: nil}
+  end
+
+  defp from_conversation(attrs), do: attrs
 
   @doc "Changes a built tool (a Workshop change to its code)."
   @spec update_tool(Tool.t(), map()) :: {:ok, Tool.t()} | {:error, Ecto.Changeset.t()}

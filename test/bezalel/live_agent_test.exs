@@ -52,6 +52,15 @@ defmodule Bezalel.LiveAgentTest do
     end
   end
 
+  # Feeds the screen what the loop has sent and still sends for a moment.
+  defp drain(view) do
+    receive do
+      {:rho, _session, _event} = message -> view |> render_info(message) |> drain()
+    after
+      200 -> view
+    end
+  end
+
   defp stream(view), do: assigns(view).streams[assigns(view).conversation.id]
   defp types(blocks), do: Enum.map(blocks, & &1["type"])
   defp block(blocks, type), do: Enum.find(blocks, &(&1["type"] == type))
@@ -264,6 +273,147 @@ defmodule Bezalel.LiveAgentTest do
     view = view |> render_info({:tap, {:study, :stop}}) |> until()
     assert assigns(view).stale == MapSet.new()
     assert assigns(view).sessions == %{}
+  end
+
+  test "deleting a conversation while its reply streams stops it first; Undo brings it back as the chat showed it" do
+    script([[{:text, "Partial answer"}, :block]])
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    view = until(view, &match?(%{type: :message_update}, &1))
+    %{id: cid} = assigns(view).conversation
+    question = List.last(assigns(view).messages)
+    # A delete waiting for the reply to end, and a message it hasn't taken in.
+    view = render_info(view, {:tap, {:study, {:delete, question.id}}})
+    shown = Enum.map(assigns(view).messages, & &1.id)
+    view = ask(view, "And Oholiab?")
+    assert stream(view).pending == ["And Oholiab?"]
+
+    view = render_info(view, {:tap, {:convs, {:delete, cid}}})
+    refute Live.running?(cid)
+    refute Map.has_key?(assigns(view).streams, cid)
+    assert assigns(view).sessions == %{}
+    assert assigns(view).stale == MapSet.new()
+    assert assigns(view).edits == %{}
+    assert %{name: "New study"} = assigns(view).conversation
+    # What the loop sent as it stopped reaches nobody.
+    view = drain(view)
+    assert Library.get_conversation(cid) == nil
+
+    view = render_info(view, {:tap, {:convs, :undo}})
+    assert assigns(view).conversation.id == cid
+    messages = assigns(view).messages
+    # The waiting delete was made; what streamed was kept, then the message.
+    refute Enum.any?(messages, &(&1.id == question.id))
+    assert Enum.drop(Enum.map(messages, & &1.id), -2) == shown
+
+    assert [
+             %{role: :agent, blocks: [%{"type" => "SUMMARY", "first" => "Partial answer"}]},
+             %{role: :user, text: "And Oholiab?"}
+           ] = Enum.take(messages, -2)
+
+    assert %{message_count: count} = Enum.find(assigns(view).shelf, &(&1.conversation.id == cid))
+    assert count == length(messages)
+  end
+
+  defmodule SlowTool do
+    @moduledoc false
+    @behaviour Rho.Tool
+
+    @impl true
+    def name, do: "slow_tool"
+    @impl true
+    def description, do: "Takes a moment."
+    @impl true
+    def parameter_schema, do: %{"type" => "object", "properties" => %{}}
+
+    @impl true
+    def run(_args, _ctx) do
+      Process.sleep(300)
+      {:ok, "slow result"}
+    end
+  end
+
+  test "deleting a conversation while a tool runs waits for its result before the loop goes" do
+    :ok = Rho.ToolRegistry.register(SlowTool)
+    on_exit(fn -> Rho.ToolRegistry.unregister("slow_tool") end)
+    script([[{:tool_call, "c1", "slow_tool", %{}}], [{:text, "Never asked."}]])
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    view = until(view, &match?(%{type: :tool_execution_start}, &1))
+    %{id: cid} = assigns(view).conversation
+
+    view = render_info(view, {:tap, {:convs, {:delete, cid}}})
+    refute Live.running?(cid)
+    _view = drain(view)
+
+    # Deleted, kept until its purge.
+    path = Conversation |> Repo.get(cid) |> Library.session_path()
+    {:ok, _session, branch} = Rho.Session.open(path, "anthropic:x")
+
+    assert Enum.any?(
+             branch,
+             &match?(%{"message" => %{"role" => "toolResult", "toolCallId" => "c1"}}, &1)
+           )
+  end
+
+  test "a message the loop took in just before a delete isn't added again by it" do
+    script([[{:sleep, 300}, {:text, "First part."}], [{:text, "More"}, :block]])
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    view = ask(view, "And Oholiab?")
+    assert stream(view).pending == ["And Oholiab?"]
+    # The loop takes it in and asks again; this screen hasn't seen that yet.
+    assert_receive {:llm_request, _}
+    assert_receive {:llm_request, _}, 2_000
+    %{id: cid} = assigns(view).conversation
+
+    view = render_info(view, {:tap, {:convs, {:delete, cid}}})
+    view = render_info(view, {:tap, {:convs, :undo}})
+
+    assert ["Who is Bezalel?", "And Oholiab?"] ==
+             assigns(view).messages
+             |> Enum.take(-4)
+             |> Enum.flat_map(&if(&1.role == :user, do: [&1.text], else: []))
+  end
+
+  test "a message that started a run after one ended isn't added again by a delete" do
+    script([[{:text, "First answer."}], [{:text, "More"}, :block]])
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    # The run ends; this screen hasn't seen that yet, so the next message
+    # steers the idle loop, which starts a run with it.
+    await_queued(&match?({:rho, _, %{type: :agent_end}}, &1))
+    view = ask(view, "And Oholiab?")
+    assert stream(view).pending == ["And Oholiab?"]
+    assert_receive {:llm_request, _}
+    assert_receive {:llm_request, _}, 2_000
+    %{id: cid} = assigns(view).conversation
+
+    view = render_info(view, {:tap, {:convs, {:delete, cid}}})
+    view = render_info(view, {:tap, {:convs, :undo}})
+
+    assert ["Who is Bezalel?", "And Oholiab?"] ==
+             assigns(view).messages
+             |> Enum.take(-4)
+             |> Enum.flat_map(&if(&1.role == :user, do: [&1.text], else: []))
+  end
+
+  # Waits until a message matching `queued?` is in this process's mailbox,
+  # leaving it there.
+  defp await_queued(queued?, tries \\ 200) do
+    {:messages, messages} = Process.info(self(), :messages)
+
+    cond do
+      Enum.any?(messages, queued?) ->
+        :ok
+
+      tries == 0 ->
+        flunk("never queued")
+
+      true ->
+        Process.sleep(10)
+        await_queued(queued?, tries - 1)
+    end
   end
 
   test "after a restart the next question resumes the session: the model sees the reply as written" do

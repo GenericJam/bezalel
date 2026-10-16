@@ -3,7 +3,9 @@ defmodule Bezalel.Library.Conversation do
   One study conversation on the shelf: a week's sermon prep, a word study, ...
   Its transcript is its rho session (`session_id`, in the file
   `session_file` under `Rho.Session.dir/0`; both nil until it's first
-  written); `message_count` is what the shelf shows.
+  written); `message_count` is what the shelf shows. `deleted_at` is set
+  while a delete can still be undone (`Bezalel.Library.delete_conversation/1`):
+  the conversation is off the shelf until it's purged or put back.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -15,6 +17,7 @@ defmodule Bezalel.Library.Conversation do
     field :session_id, :string
     field :session_file, :string
     field :message_count, :integer, default: 0
+    field :deleted_at, :utc_datetime_usec
     timestamps(type: :utc_datetime_usec)
   end
 

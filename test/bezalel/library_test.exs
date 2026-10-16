@@ -1,6 +1,8 @@
 defmodule Bezalel.LibraryTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query, only: [from: 2]
+
   alias Bezalel.Library
   alias Bezalel.Library.{Conversation, Tool}
   alias Bezalel.Repo
@@ -236,6 +238,121 @@ defmodule Bezalel.LibraryTest do
     {:ok, _} = Library.add_message(c, %{role: :user, text: "two"})
     assert texts(c) == ["one"]
     assert [%{message_count: 1}] = Library.list_conversations()
+  end
+
+  describe "deleting a conversation" do
+    # What's kept for a conversation's session besides its file: the
+    # picture cache and rho's spilled tool output and todo list.
+    defp side_files(c) do
+      data = Rho.Config.data_dir()
+
+      [
+        Path.join([Bezalel.Images.dir(), c.session_id, "e1-0-100x100.10x10.png"]),
+        Path.join([data, "artifacts", c.session_id, "call1.txt"]),
+        Path.join([data, "todos", c.session_id <> ".json"])
+      ]
+    end
+
+    defp with_files!(name) do
+      c = conversation!(name)
+      {:ok, _} = Library.add_message(c, %{role: :user, text: "#{name}?"})
+      c = Library.get_conversation(c.id)
+
+      for path <- side_files(c) do
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, "x")
+      end
+
+      c
+    end
+
+    test "takes it off the shelf, and Undo puts it back in its place with its messages" do
+      ruth = conversation!("Ruth")
+      psalms = with_files!("Psalm 119")
+      john = conversation!("John 1")
+
+      Repo.update_all(from(c in Conversation, where: c.id == ^ruth.id),
+        set: [updated_at: ~U[2026-01-01 00:00:00.000000Z]]
+      )
+
+      shelf = Enum.map(Library.list_conversations(), & &1.conversation.id)
+      assert shelf == [john.id, psalms.id, ruth.id]
+      shown = Library.messages(psalms.id)
+
+      {:ok, deleted} = Library.delete_conversation(psalms.id)
+      assert deleted.name == "Psalm 119"
+      assert Enum.map(Library.list_conversations(), & &1.conversation.id) == [john.id, ruth.id]
+      assert Library.get_conversation(psalms.id) == nil
+      assert Library.conversation_count() == 2
+      assert Library.messages(psalms.id) == []
+      # A picture still being made reads it until the purge.
+      assert Library.session_path_by_id(psalms.session_id) == Library.session_path(psalms)
+      # Writes to it do nothing meanwhile (a scripted reply landing late).
+      :ok = Library.touch(psalms.id)
+      assert {:error, :not_found} = Library.delete_conversation(psalms.id)
+      # Kept until it's purged.
+      assert File.exists?(Library.session_path(psalms))
+
+      :ok = Library.undelete(deleted)
+      assert Enum.map(Library.list_conversations(), & &1.conversation.id) == shelf
+      assert Library.messages(psalms.id) == shown
+      assert [_, %{message_count: 1}, _] = Library.list_conversations()
+      assert Enum.all?(side_files(psalms), &File.exists?/1)
+    end
+
+    test "a purge removes its row, its session and the files kept for it, and nothing of another's" do
+      gone = with_files!("Ruth")
+      kept = with_files!("Psalm 119")
+      {:ok, deleted} = Library.delete_conversation(gone.id)
+
+      :ok = Library.purge(deleted)
+      refute Repo.get(Conversation, gone.id)
+      refute File.exists?(Library.session_path(gone))
+      refute Enum.any?(side_files(gone), &File.exists?/1)
+      refute File.exists?(Path.join(Bezalel.Images.dir(), gone.session_id))
+      assert File.exists?(Library.session_path(kept))
+      assert Enum.all?(side_files(kept), &File.exists?/1)
+      assert {:error, :gone} = Library.undelete(deleted)
+    end
+
+    test "a purge leaves a conversation that was put back, or deleted again since" do
+      c = with_files!("Ruth")
+      {:ok, first} = Library.delete_conversation(c.id)
+      :ok = Library.undelete(first)
+      :ok = Library.purge(first)
+      assert Library.get_conversation(c.id)
+
+      {:ok, second} = Library.delete_conversation(c.id)
+      :ok = Library.purge(first)
+      :ok = Library.undelete(second)
+      assert texts(c) == ["Ruth?"]
+    end
+
+    test "what's still deleted at start is purged" do
+      c = with_files!("Ruth")
+      kept = conversation!("Psalm 119")
+      {:ok, _} = Library.delete_conversation(c.id)
+
+      :ok = Library.purge_deleted()
+      refute Repo.get(Conversation, c.id)
+      refute File.exists?(Library.session_path(c))
+      assert Library.get_conversation(kept.id)
+    end
+
+    test "a tool built from a conversation purged meanwhile is saved without it" do
+      c = conversation!()
+      {:ok, deleted} = Library.delete_conversation(c.id)
+      :ok = Library.purge(deleted)
+
+      assert {:ok, %Tool{conversation_id: nil}} =
+               Library.create_tool(%{
+                 name: "Outline",
+                 kind: "outline",
+                 description: "An outline",
+                 data: %{},
+                 conversation_id: c.id
+               })
+    end
   end
 
   describe "a live reply, read back from the session" do

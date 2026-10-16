@@ -47,6 +47,9 @@ defmodule Bezalel.AppScreen do
     # may have changed with nobody listening: at boot (a launch that died)
     # or while this screen was down. Subscribed first, so none is missed.
     :ok = Bezalel.Workshop.reconcile()
+    # Conversations deleted while their Undo was offered when the app (or
+    # this screen) went down stay deleted.
+    :ok = Library.purge_deleted()
 
     conversation = Library.get_conversation(Settings.conversation_id()) || Library.seed!()
 
@@ -151,13 +154,15 @@ defmodule Bezalel.AppScreen do
     ios = %{padding_bottom: bottom + inset}
     o = Palette.overlay()
 
+    # A deleted conversation's Undo is the shelf's; the rest are Study's.
+    undo_owner = if match?({:conversation, _, _}, toast.undo), do: :convs, else: :study
+
     actions =
-      for {show?, label, tag} <- [
-            {toast.ask_again, "Ask again", :ask_again},
-            {toast.undo != nil, "Undo", :undo}
+      for {show?, label, tap} <- [
+            {toast.ask_again, "Ask again", {self(), {:study, :ask_again}}},
+            {toast.undo != nil, "Undo", {self(), {undo_owner, :undo}}}
           ],
           show? do
-        tap = {self(), {:study, tag}}
         ~MOB(<Text
   text={label}
   font={:ui_semibold}
@@ -262,6 +267,9 @@ defmodule Bezalel.AppScreen do
       _ -> {:noreply, socket}
     end
   end
+
+  def handle_info({:purge, deleted}, socket),
+    do: {:noreply, Conversations.purge(deleted, socket)}
 
   def handle_info({:mob_device, :color_scheme_changed, _scheme}, socket) do
     if socket.assigns.mode == :system, do: Mob.Theme.set(MobBezalel.System)

@@ -311,6 +311,13 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   `Bezalel.Library.Transcript`; Delete and Undo are branch moves), SQLite
   keeps the shelf (name, kind, kicker, session id and file, message count)
   and the built tools; seeds the design's Exodus 31 study on first run.
+  Deleting a conversation (its ⋯ on the Conversations tab) marks its row
+  (`deleted_at`: off the shelf, writes to it do nothing) and purges it,
+  with its session file and the files kept under rho's data dir for its
+  session id (`images/`, `artifacts/`, `todos/`), when its Undo window
+  ends or at the next start
+  (`decisions/2026-10-16-conversation-delete-undo-then-purge.md`). A new
+  file kept per session belongs in `Library.purge/1`.
   Pictures in the chat (a tool's, a model's, an attachment's: image parts
   in the session) are downscaled on the phone and cached
   (`Bezalel.Images`, `Bezalel.Views.Images`, with a full-screen viewer).

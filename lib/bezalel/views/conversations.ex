@@ -1,11 +1,21 @@
 defmodule Bezalel.Views.Conversations do
-  @moduledoc "The Conversations tab: a shelf of studies, one open at a time."
+  @moduledoc """
+  The Conversations tab: a shelf of studies, one open at a time.
+
+  Each row's ⋯ menu deletes it: the row goes at once and the toast offers
+  Undo, which puts it back in its place (and open again, if it was). The
+  conversation is purged once the Undo is gone (`purge/2`, when its window
+  ends; `Bezalel.Library.purge_deleted/0` at start). A reply streaming in
+  it is cut off first (`Bezalel.Views.Study.let_go/2`). Deleting the open
+  one opens the latest left, or a new study when none is.
+  """
   import Mob.Sigil
 
   alias Bezalel.Library
-  alias Bezalel.Views.Helpers
+  alias Bezalel.Library.Deleted
+  alias Bezalel.Views.{Helpers, Study}
   alias Mob.Socket
-  alias MobBezalel.UI
+  alias MobBezalel.{Icons, UI}
 
   @page 30
 
@@ -21,7 +31,7 @@ defmodule Bezalel.Views.Conversations do
 
   @doc "The Conversations body: a lazy list, paged in as it scrolls."
   def render(assigns) do
-    rows = Enum.map(assigns.shelf, &row(&1, assigns.conversation.id))
+    rows = Enum.map(assigns.shelf, &row(&1, assigns.conversation.id, assigns.menu))
     new_tap = {self(), {:convs, :new}}
     more = {self(), {:convs, :more}}
 
@@ -58,7 +68,7 @@ defmodule Bezalel.Views.Conversations do
     """
   end
 
-  defp row(%{conversation: c, message_count: n}, open_id) do
+  defp row(%{conversation: c, message_count: n}, open_id, menu) do
     open? = c.id == open_id
 
     {border, state, state_color} =
@@ -67,6 +77,15 @@ defmodule Bezalel.Views.Conversations do
     meta = "#{c.kind} · #{Helpers.count(n, "message")}"
     tap = {self(), {:convs, {:open, c.id}}}
     id = "conversation-#{c.id}"
+    more_id = "conversation-more-#{c.id}"
+    more = Icons.icon(:more, 16, :muted)
+    menu_tap = {self(), {:convs, {:menu, c.id}}}
+
+    # The menu takes the state's place while it's open.
+    trailing =
+      if menu == {:conversation, c.id},
+        do: Helpers.action_chip("Delete", {self(), {:convs, {:delete, c.id}}}, :error),
+        else: UI.kicker(state, state_color)
 
     ~MOB"""
     <Box
@@ -92,7 +111,19 @@ defmodule Bezalel.Views.Conversations do
             <Text text={c.name} font={:display} text_size={18} text_color={:on_surface} />
             <Text text={meta} text_size={12} text_color={:muted} />
           </Column>
-          {UI.kicker(state, state_color)}
+          <Row gap={4} align={:center} fill_width={false}>
+            {trailing}
+            <Box
+              id={more_id}
+              width={32}
+              height={28}
+              align="center"
+              fill_width={false}
+              on_tap={menu_tap}
+            >
+              {more}
+            </Box>
+          </Row>
         </Row>
       </Box>
     </Box>
@@ -112,6 +143,31 @@ defmodule Bezalel.Views.Conversations do
      )}
   end
 
+  def handle({:menu, id}, socket) do
+    menu = if socket.assigns.menu == {:conversation, id}, do: nil, else: {:conversation, id}
+    {:noreply, Socket.assign(socket, :menu, menu)}
+  end
+
+  def handle({:delete, id}, socket) do
+    socket = Socket.assign(socket, :menu, nil)
+
+    case Library.get_conversation(id) do
+      # Already gone (a double tap).
+      nil -> {:noreply, load(socket)}
+      c -> {:noreply, delete(socket, c)}
+    end
+  end
+
+  def handle(:undo, socket) do
+    case socket.assigns.toast do
+      %{undo: {:conversation, deleted, instead}} ->
+        {:noreply, socket |> Socket.assign(:toast, nil) |> undelete(deleted, instead)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   def handle({:open, id}, socket) do
     case Library.get_conversation(id) do
       nil -> {:noreply, socket}
@@ -120,7 +176,85 @@ defmodule Bezalel.Views.Conversations do
   end
 
   def handle(:new, socket) do
-    {:ok, c} = Library.create_conversation(%{name: "New study", kicker: "STUDY", kind: "Study"})
+    {:ok, c} = new_study()
     {:noreply, Helpers.open_conversation(socket, c)}
   end
+
+  @doc """
+  A deleted conversation's Undo window ended (`Helpers.toast_ms/0` after
+  the delete): it's purged, and its toast goes now if it's still up.
+  """
+  def purge(%Deleted{} = deleted, socket) do
+    :ok = Library.purge(deleted)
+
+    case socket.assigns.toast do
+      %{undo: {:conversation, ^deleted, _}} -> Socket.assign(socket, :toast, nil)
+      _ -> socket
+    end
+  end
+
+  # The loop goes first (a delete writes nothing to the session, but the
+  # purge removes it); the open one gives way to the latest left, or to a
+  # new study when there's none. `instead` is what was opened in its
+  # place, for Undo.
+  defp delete(socket, c) do
+    socket = Study.let_go(socket, c.id)
+    {:ok, deleted} = Library.delete_conversation(c.id)
+    Process.send_after(self(), {:purge, deleted}, Helpers.toast_ms())
+
+    {socket, instead} =
+      if socket.assigns.conversation.id == c.id, do: open_instead(socket), else: {socket, nil}
+
+    socket
+    |> Helpers.go(:convs)
+    |> Helpers.toast("Deleted “#{c.name}”", undo: {:conversation, deleted, instead})
+  end
+
+  defp open_instead(socket) do
+    case Library.latest_conversation() do
+      nil ->
+        {:ok, c} = new_study()
+        {Helpers.open_conversation(socket, c), {:created, c.id}}
+
+      c ->
+        {Helpers.open_conversation(socket, c), {:opened, c.id}}
+    end
+  end
+
+  # Back on the shelf; open again if it was open and what replaced it
+  # still is, and the new study made in its place goes if nothing was
+  # written to it.
+  defp undelete(socket, deleted, instead) do
+    case Library.undelete(deleted) do
+      :ok -> socket |> reopen(deleted.conversation_id, instead) |> Helpers.refresh()
+      {:error, :gone} -> socket
+    end
+  end
+
+  defp reopen(socket, _id, nil), do: socket
+
+  defp reopen(socket, id, {how, other}) do
+    socket =
+      if socket.assigns.conversation.id == other,
+        do: open_here(socket, Library.get_conversation(id)),
+        else: socket
+
+    if how == :created and socket.assigns.conversation.id != other,
+      do: :ok = Library.discard_unwritten(other)
+
+    socket
+  end
+
+  # Opens the conversation in Study, staying on the tab the user is on.
+  defp open_here(socket, c) do
+    tab = socket.assigns.tab
+    socket = Helpers.open_conversation(socket, c)
+
+    if tab == :tool,
+      do: Helpers.open_tool(socket, socket.assigns.tool.id),
+      else: Helpers.go(socket, tab)
+  end
+
+  defp new_study,
+    do: Library.create_conversation(%{name: "New study", kicker: "STUDY", kind: "Study"})
 end
