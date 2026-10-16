@@ -267,8 +267,11 @@ defmodule Bezalel.Views.Study do
 
   # The open blocks with a body, newest first, up to the native views the
   # screen can hold: mob has 256 native component slots, and a view past
-  # them renders nothing. Older ones show their Markdown as text.
-  @markdown_views 200
+  # them renders nothing. A frame's new views take their slots before the
+  # last frame's leave theirs (mob expands the tree, then reconciles), so
+  # two frames' worth must fit: Expand all in a long study swaps most of
+  # them at once. Older ones show their Markdown as text.
+  @markdown_views 120
 
   @doc false
   def markdown_keys(messages, {live, live_blocks}, expanded) do

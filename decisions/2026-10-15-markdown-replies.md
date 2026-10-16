@@ -1,6 +1,7 @@
 # Replies and tool results render as Markdown (mob_markdown)
 
-Status: accepted
+Status: accepted; the table layout and the 200-view budget superseded by
+`2026-10-15-markdown-tables-scroll.md`
 
 ## Context
 Model replies and tool results are Markdown but showed as raw text.

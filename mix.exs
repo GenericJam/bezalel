@@ -38,7 +38,7 @@ defmodule Bezalel.MixProject do
       sibling(
         :mob_markdown,
         "GenericJam/mob_markdown",
-        "cf2634e13cb4b9acf54feaec6f93f7f52feb8cc8"
+        "075ef619fc50e18e8482400c6f13304f93264f4e"
       ),
       {:ecto_sqlite3, "~> 0.18"},
       # The study packs are read with Exqlite directly (Bezalel.Study.DB).

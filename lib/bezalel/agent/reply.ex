@@ -230,6 +230,7 @@ defmodule Bezalel.Agent.Reply do
     |> strip_block_marks()
     |> then(&Regex.replace(Patterns.get(:md_link), &1, "\\1"))
     |> String.replace(["**", "__", "~~", "`", "*"], "")
+    |> then(&Regex.replace(Patterns.get(:md_underscore), &1, ""))
     |> String.split()
     |> Enum.join(" ")
   end
@@ -293,8 +294,12 @@ defmodule Bezalel.Agent.Reply do
     count = &(length(String.split(markdown, &1)) - 1)
     singles = markdown |> String.replace("**", "") |> String.split("*") |> length()
 
+    underscores =
+      length(Regex.scan(Patterns.get(:md_underscore), String.replace(markdown, "__", "")))
+
     count.("[") == count.("]") and count.("(") == count.(")") and
-      Enum.all?(["`", "~~", "**"], &(rem(count.(&1), 2) == 0)) and rem(singles - 1, 2) == 0
+      Enum.all?(["`", "~~", "**", "__"], &(rem(count.(&1), 2) == 0)) and rem(singles - 1, 2) == 0 and
+      rem(underscores, 2) == 0
   end
 
   # The first line with words in it, plain, cut to about a line.
@@ -352,7 +357,21 @@ defmodule Bezalel.Agent.Reply do
       end)
 
     shown = kept |> Enum.reverse() |> Enum.join("\n") |> String.trim_trailing()
-    {shown, length(kept) < length(lines)}
+
+    # A first line longer than the limit on its own (JSON, minified HTML) is
+    # cut at a word.
+    if String.length(shown) > @result_chars,
+      do: {clip(shown), true},
+      else: {shown, length(kept) < length(lines)}
+  end
+
+  defp clip(text) do
+    head = String.slice(text, 0, @result_chars)
+
+    case String.split(head, " ") do
+      [_one] -> head
+      words -> words |> Enum.drop(-1) |> Enum.join(" ")
+    end
   end
 
   # A passage from lookup_verse wins over word_study's examples; the

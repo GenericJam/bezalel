@@ -172,15 +172,15 @@ defmodule Bezalel.LiveAgentTest do
 
   test "past the native views the screen can hold, the oldest open blocks show their Markdown as text" do
     messages =
-      for n <- 1..205,
+      for n <- 1..125,
           do: %{id: "m#{n}", role: :agent, blocks: [%{"id" => "sum", "rest" => "**#{n}**"}]}
 
     expanded = MapSet.new(messages, &"#{&1.id}:sum")
     live = {%{id: "live-1"}, [%{"id" => "sum", "rest" => "**live**"}]}
     keys = Study.markdown_keys(messages, live, MapSet.put(expanded, "live-1:sum"))
 
-    assert MapSet.size(keys) == 200
-    assert "live-1:sum" in keys and "m205:sum" in keys and "m7:sum" in keys
+    assert MapSet.size(keys) == 120
+    assert "live-1:sum" in keys and "m125:sum" in keys and "m7:sum" in keys
     refute "m6:sum" in keys
 
     # Folded blocks and empty bodies take none.

@@ -53,6 +53,15 @@ defmodule Bezalel.Agent.ReplyTest do
 
       link = "Read [Gen. 1](https://x.org) first."
       assert %{"rest" => ^link, "cut" => true} = summary(link)
+
+      for text <- ["_Called. Filled._ That is Bezalel.", "__Called. Filled.__ That is Bezalel."] do
+        assert %{"first" => "Called. Filled. That is Bezalel.", "rest" => ^text, "cut" => true} =
+                 summary(text)
+      end
+
+      # An underscore inside a word is no emphasis.
+      assert %{"first" => "Call lookup_verse.", "rest" => "Then read."} =
+               summary("Call lookup_verse. Then read.")
     end
 
     test "a long first line is cut at a word; the rest is the whole text" do
@@ -117,6 +126,14 @@ defmodule Bezalel.Agent.ReplyTest do
     test "an error says so before its text" do
       assert tool("The core study pack isn't installed.", true)["rest"] ==
                "Error: The core study pack isn't installed."
+    end
+
+    test "a first line longer than the limit on its own is cut at a word, and says there's more" do
+      text = String.duplicate("word ", 200)
+      rest = tool(text)["rest"]
+
+      assert String.ends_with?(rest, "word\n\n…")
+      assert String.length(rest) <= 503
     end
   end
 

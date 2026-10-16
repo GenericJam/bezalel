@@ -290,7 +290,7 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 
 ## The app
 
-- rho, mob_secure_store and mob_bezalel are GitHub deps pinned to commits in
+- rho, mob_secure_store, mob_bezalel and mob_markdown are GitHub deps pinned to commits in
   `mix.exs` (`sibling/3`), so a fresh clone builds. To work on one alongside
   the app, run with `BEZALEL_LOCAL_DEPS=1` (uses `../rho`, `../mob_secure_store`,
   `../mob_bezalel`, `../mob_markdown`), and bump the pinned commit once the change is pushed.
@@ -328,6 +328,15 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   NIF, so adding or changing it needs `mix mob.deploy --native`. The iOS
   simulator's Keychain needs `ios/simulator_entitlements.plist` (linked by
   `ios/build.zig`); change its bundle id along with the app's.
+- **mob_markdown** (GenericJam/mob_markdown, unreleased, pinned) renders
+  block bodies (summary, thinking, tool results) as native Markdown views
+  styled by `MobBezalel.UI.markdown_style/1`; tables scroll sideways at
+  their natural width. Activated with `:acknowledge_unsafe_plugins`; a
+  change to it needs `mix mob.deploy --native` on both platforms. The chat
+  keeps at most 120 open blocks in native views (two frames' worth of mob's
+  256 component slots, `Bezalel.Views.Study.markdown_keys/3`), one atom per
+  block shown; older ones show their Markdown as text
+  (`decisions/2026-10-15-markdown-tables-scroll.md`).
 - Signing in during development: Settings → Account. "Sign in" opens the
   provider's page in the phone's browser; it comes back to a listener on
   localhost inside the app (Claude: port 54545; ChatGPT: 1455). If Claude's
