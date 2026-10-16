@@ -34,7 +34,7 @@ defmodule Bezalel.MixProject do
        github: "GenericJam/mob", ref: "f327d751ab90109da0de516729b352f0561ac6dc", override: true},
       # 0.7.25+: bundles a style package's fonts (mob_bezalel's) in dev and
       # release builds (MOB-476, MOB-480).
-      {:mob_dev, "~> 0.7.25", only: :dev, runtime: false},
+      {:mob_dev, "~> 0.7.29", only: :dev, runtime: false},
       # The design plugin (style package): Bezalel's themes, palette, fonts.
       sibling(:mob_bezalel, "GenericJam/mob_bezalel", "9dbf917e9f86ee81d997b85f225ef2209c741c17"),
       {:ecto_sqlite3, "~> 0.18"},
