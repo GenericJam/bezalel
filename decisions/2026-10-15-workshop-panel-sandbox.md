@@ -26,8 +26,9 @@ the check keeps network modules out of built code. Three gaps were left
 ## Decision
 - The host sends a cleaned view. Web views, videos, camera previews and
   native views become a note. A `src` or `url` prop (also in a platform
-  block, a `%Mob.Style{}` or under a string key) is kept only if it is an
-  atom, a `plugin://` asset or a string without `:` (an on-phone path); any
+  block, a `%Mob.Style{}` or under a string key) is kept only if it is a
+  `plugin://` asset or a string (or an atom, read as its name) without `:`
+  (an on-phone path); any
   scheme (`http`, `https`, `ftp`, `file`, `data`, ...) is dropped. `data:`
   URLs are dropped too: neither platform decodes them, so allowing them
   would gain nothing and leave a scheme to reason about. Native only fetches

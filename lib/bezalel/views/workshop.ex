@@ -350,7 +350,8 @@ defmodule Bezalel.Views.Workshop do
       if removing?,
         do:
           {"Remove #{names}?",
-           "Its code leaves your phone, and the study agent stops offering it. The shelf entry goes too."},
+           "It stops running, and the study agent stops offering it. The shelf entry goes too. " <>
+             "If Bezalel keeps crashing without it while that change is on probation, it’s put back."},
         else:
           {"Add #{if names == "", do: "this change", else: names} to Bezalel?",
            "It runs on your phone. It’s written to read only your study library and draw " <>
