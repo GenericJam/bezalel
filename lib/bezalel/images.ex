@@ -12,7 +12,10 @@ defmodule Bezalel.Images do
   chat's width, or the full-screen viewer's), and the result is cached as
   a file under `<data dir>/images/<session id>/`, which the native image
   view reads. A picture the codec can't shrink (it already fits, or a
-  format it doesn't decode) is cached as it is.
+  format it doesn't decode) is cached as it is. The original's size goes
+  with the file (in its name, `<entry>-<part>-<box>.<width>x<height>.<ext>`):
+  the chat and the viewer size a picture by it, not by the file's pixels,
+  so one decoded smaller than its box is still drawn at its size.
   """
 
   alias Bezalel.Images.Codec
@@ -26,7 +29,13 @@ defmodule Bezalel.Images do
   @viewer_max_px 2560
 
   @type size :: :chat | :viewer
-  @type ready :: %{path: String.t(), width: pos_integer(), height: pos_integer()}
+  @typedoc "A made picture: its file, the file's pixels, and the original's."
+  @type ready :: %{
+          path: String.t(),
+          width: pos_integer(),
+          height: pos_integer(),
+          original: {pos_integer(), pos_integer()}
+        }
 
   @doc """
   The screen in dp and its pixel ratio (`:mob_nif.screen_info/0` on the
@@ -75,41 +84,61 @@ defmodule Bezalel.Images do
   end
 
   defp make(session_path, image, w, h, base) do
-    with {:ok, bytes} <- read_part(session_path, image.entry, image.index) do
+    with {:ok, bytes} <- read_part(session_path, image.entry, image.index),
+         {:ok, %{width: ow, height: oh}} <- Codec.info(bytes) do
+      base = "#{base}.#{ow}x#{oh}"
+
       case Codec.thumbnail(bytes, w, h) do
         {:ok, %{data: data, width: tw, height: th}} ->
-          write(base <> ".png", data, tw, th)
+          write(base <> ".png", data, tw, th, {ow, oh})
 
         {:original, %{width: ow, height: oh}} ->
-          write(base <> extension(image.mime, bytes), bytes, ow, oh)
+          write(base <> extension(image.mime, bytes), bytes, ow, oh, {ow, oh})
 
         {:error, _} = error ->
           error
       end
+    else
+      :error -> {:error, :unrecognized}
+      {:error, _} = error -> error
     end
   end
 
-  defp write(path, data, width, height) do
+  defp write(path, data, width, height, original) do
     File.mkdir_p!(Path.dirname(path))
     tmp = path <> ".tmp"
     File.write!(tmp, data)
     File.rename!(tmp, path)
-    {:ok, %{path: path, width: width, height: height}}
+    {:ok, %{path: path, width: width, height: height, original: original}}
   end
 
-  # A file made earlier at this box (any extension), with its size.
+  # A file made earlier at this box (any extension), with its size and the
+  # original's (from its name; a file named without it, or a `.tmp` one
+  # being written, doesn't count).
   defp cached(base) do
-    case Path.wildcard(base <> ".*") |> Enum.reject(&String.ends_with?(&1, ".tmp")) do
-      [path | _] ->
-        with {:ok, bytes} <- File.read(path),
-             {:ok, %{width: w, height: h}} <- Codec.info(bytes) do
-          {:ok, %{path: path, width: w, height: h}}
-        else
-          _ -> :miss
-        end
+    (base <> ".*")
+    |> Path.wildcard()
+    |> Enum.find_value(:miss, &cached_file/1)
+  end
 
-      [] ->
-        :miss
+  defp cached_file(path) do
+    with [_base, dims, _ext] <- path |> Path.basename() |> String.split("."),
+         {:ok, original} <- dims(dims),
+         {:ok, bytes} <- File.read(path),
+         {:ok, %{width: w, height: h}} <- Codec.info(bytes) do
+      {:ok, %{path: path, width: w, height: h, original: original}}
+    else
+      _ -> nil
+    end
+  end
+
+  defp dims(text) do
+    with [w, h] <- String.split(text, "x"),
+         {w, ""} when w > 0 <- Integer.parse(w),
+         {h, ""} when h > 0 <- Integer.parse(h) do
+      {:ok, {w, h}}
+    else
+      _ -> :error
     end
   end
 

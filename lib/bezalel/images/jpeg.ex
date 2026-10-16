@@ -1,6 +1,6 @@
 defmodule Bezalel.Images.Jpeg do
   @moduledoc """
-  JPEG header parsing and a 1/8-scale "DC only" baseline decoder.
+  JPEG header parsing and a scaled baseline decoder.
 
   `info/1` walks the markers up to the frame header (SOF0..SOF15) and reads
   the EXIF orientation (APP1, IFD0 tag 0x0112) on the way; dimensions are
@@ -8,12 +8,19 @@ defmodule Bezalel.Images.Jpeg do
 
   `thumbnail/3` decodes baseline Huffman JPEGs (SOF0/SOF1, 8-bit, one
   interleaved scan holding every component, or a single-component
-  grayscale scan). Every 8x8 block's average colour is its DC coefficient,
-  so only the DC values are kept; AC codes are entropy-decoded just to be
-  skipped. That yields the image at 1/8 scale without any IDCT. Restart
-  intervals (DRI/RSTn), 0xFF00 stuffing, any H/V chroma subsampling
-  (nearest-sample upsampling) and grayscale are handled. One MCU row of DC
-  values is held at a time; the 1/8 rows stream through
+  grayscale scan) at the smallest of 1/8, 1/4, 1/2 and 1/1 scale whose
+  result still covers the box it's made for (`scale/4`), then
+  box-downscales to fit. Each 8x8 block becomes n x n pixels (n = 1, 2, 4
+  or 8): its 8-point inverse DCT averaged over (8/n) x (8/n) squares,
+  folded into the basis, which is what libjpeg's reduced-size IDCTs
+  compute (jidctred.c); at 1/8 that is the DC value alone. Coefficients
+  whose basis averages to zero at the scale (at 1/2: row and column 4; at
+  1/4: 2, 4, 6) are entropy-decoded just to be skipped. A subsampled
+  chroma component is decoded at up to twice the scale per halving (to
+  full size), as libjpeg does, then sampled nearest. Restart intervals
+  (DRI/RSTn), 0xFF00 stuffing, any H/V chroma subsampling and grayscale
+  are handled. One MCU row of
+  pixels is held at a time; the rows stream through
   `Bezalel.Images.Resample` into the PNG writer. Only for EXIF orientations
   other than 1 is the (already small) destination image collected and
   re-oriented before encoding.
@@ -26,6 +33,48 @@ defmodule Bezalel.Images.Jpeg do
   import Bitwise
 
   alias Bezalel.Images.{PngWriter, Resample}
+
+  @scales [1, 2, 4, 8]
+
+  # Zigzag index -> {row, column} in the 8x8 block: the anti-diagonals in
+  # turn, upwards on even ones, downwards on odd ones.
+  @zigzag List.to_tuple(
+            for s <- 0..14,
+                r <-
+                  if(rem(s, 2) == 0,
+                    do: min(s, 7)..max(s - 7, 0)//-1,
+                    else: max(s - 7, 0)..min(s, 7)
+                  ),
+                do: {r, s - r}
+          )
+
+  # The reduced IDCT's basis in fixed point, by n: elem(elem(k, x), u) is
+  # C(u) times the mean of cos((2j + 1) u pi / 16) over the 8/n samples j
+  # that output pixel x covers; C(0) = 1/sqrt(2), C(u > 0) = 1.
+  @idct_bits 11
+  @basis Map.new(@scales, fn n ->
+           step = div(8, n)
+
+           rows =
+             for x <- 0..(n - 1) do
+               List.to_tuple(
+                 for u <- 0..7 do
+                   c = if u == 0, do: :math.sqrt(0.5), else: 1.0
+                   j = (x * step)..(x * step + step - 1)
+                   mean = Enum.sum(for i <- j, do: :math.cos((2 * i + 1) * u * :math.pi() / 16))
+                   round(c * mean / step * (1 <<< @idct_bits))
+                 end
+               )
+             end
+
+           {n, List.to_tuple(rows)}
+         end)
+
+  # By n, whether coefficient row / column u is used (its basis isn't all zero).
+  @used Map.new(@basis, fn {n, rows} ->
+          {n,
+           List.to_tuple(for u <- 0..7, do: Enum.any?(Tuple.to_list(rows), &(elem(&1, u) != 0)))}
+        end)
 
   @doc "Displayed dimensions (EXIF orientation applied)."
   @spec info(binary()) :: {:ok, %{width: pos_integer(), height: pos_integer()}} | :error
@@ -43,9 +92,9 @@ defmodule Bezalel.Images.Jpeg do
   def info(_jpeg), do: :error
 
   @doc """
-  Decodes at 1/8 scale and fits the result inside `max_width` x
-  `max_height` (box-downscaling further when still too large; a 1/8 image
-  already inside the box is returned as is). Encodes an RGB PNG.
+  Decodes at the scale `scale/4` picks for the box and fits the result
+  inside `max_width` x `max_height` (box-downscaling what the scale
+  leaves over). Encodes an RGB PNG.
   """
   @spec thumbnail(binary(), pos_integer(), pos_integer()) ::
           {:ok, %{data: binary(), mime: String.t(), width: pos_integer(), height: pos_integer()}}
@@ -64,6 +113,22 @@ defmodule Bezalel.Images.Jpeg do
   end
 
   def thumbnail(_jpeg, _max_width, _max_height), do: {:error, :not_jpeg}
+
+  @doc """
+  The decode scale for a `width` x `height` frame (as stored) whose
+  picture is to be `target_width` x `target_height` (also as stored): the
+  output pixels per 8x8 block, n in 1, 2, 4, 8 (1/8 .. 1/1 scale), the
+  smallest whose result, ceil(dimension * n / 8), covers the target in
+  both dimensions.
+  """
+  @spec scale(pos_integer(), pos_integer(), pos_integer(), pos_integer()) :: 1 | 2 | 4 | 8
+  def scale(width, height, target_width, target_height) do
+    Enum.find(@scales, 8, fn n ->
+      scaled(width, n) >= target_width and scaled(height, n) >= target_height
+    end)
+  end
+
+  defp scaled(dimension, n), do: div(dimension * n + 7, 8)
 
   # -- markers --------------------------------------------------------------
 
@@ -115,11 +180,12 @@ defmodule Bezalel.Images.Jpeg do
 
   defp frame(_payload, _baseline), do: %{width: 0, height: 0, comps: [], baseline: false}
 
-  defp quant_tables(<<0::4, tq::4, q0, _::binary-63, rest::binary>>, acc),
-    do: quant_tables(rest, Map.put(acc, tq, q0))
+  # Each table as a tuple of its 64 values, in zigzag order.
+  defp quant_tables(<<0::4, tq::4, q::binary-64, rest::binary>>, acc),
+    do: quant_tables(rest, Map.put(acc, tq, List.to_tuple(:binary.bin_to_list(q))))
 
-  defp quant_tables(<<1::4, tq::4, q0::16, _::binary-126, rest::binary>>, acc),
-    do: quant_tables(rest, Map.put(acc, tq, q0))
+  defp quant_tables(<<1::4, tq::4, q::binary-128, rest::binary>>, acc),
+    do: quant_tables(rest, Map.put(acc, tq, List.to_tuple(for <<v::16 <- q>>, do: v)))
 
   defp quant_tables(_rest, acc), do: acc
 
@@ -268,16 +334,25 @@ defmodule Bezalel.Images.Jpeg do
 
     if Enum.any?(comps, &(&1.h == 0 or &1.v == 0)), do: throw({:image_error, :bad_sampling})
 
-    ow = div(frame.width + 7, 8)
-    oh = div(frame.height + 7, 8)
-    {dw, dh} = oriented(ow, oh, st.orientation)
+    {dw, dh} = oriented(frame.width, frame.height, st.orientation)
     {tw, th} = Resample.fit(dw, dh, mw, mh)
     {sw, sh} = oriented(tw, th, st.orientation)
+    s = scale(frame.width, frame.height, sw, sh)
+
+    comps =
+      Enum.map(comps, fn c ->
+        cs = component_scale(s, c, hmax, vmax)
+        Map.merge(c, %{scale: cs, basis: @basis[cs], used: @used[cs]})
+      end)
+
+    ow = scaled(frame.width, s)
+    oh = scaled(frame.height, s)
     channels = if match?([_], comps), do: 1, else: 3
 
     geo = %{
       ow: ow,
       oh: oh,
+      scale: s,
       hmax: hmax,
       vmax: vmax,
       mcux: div(frame.width + 8 * hmax - 1, 8 * hmax),
@@ -314,7 +389,7 @@ defmodule Bezalel.Images.Jpeg do
     {_state, rs, sink} =
       Enum.reduce(0..(geo.mcuy - 1)//1, {state, rs, sink}, fn my, {state, rs, sink} ->
         {state, mcus} = mcu_row(state, comps, geo, geo.mcux, [])
-        rows = min(geo.vmax, geo.oh - my * geo.vmax)
+        rows = min(geo.vmax * geo.scale, geo.oh - my * geo.vmax * geo.scale)
 
         emit_rows(mcus, comps, geo, rows, rs, sink)
         |> then(fn {rs, sink} -> {state, rs, sink} end)
@@ -354,39 +429,94 @@ defmodule Bezalel.Images.Jpeg do
   defp blocks(0, _c, p, bin, acc, n, out), do: {Enum.reverse(out), p, bin, acc, n}
 
   defp blocks(k, c, p, bin, acc, n, out) do
-    {diff, bin, acc, n} = block(bin, acc, n, c.dct, c.act)
+    {diff, ac, bin, acc, n} = block(bin, acc, n, c)
     p = p + diff
-    blocks(k - 1, c, p, bin, acc, n, [dc_pixel(p * c.q) | out])
+    blocks(k - 1, c, p, bin, acc, n, [pixels(p * elem(c.q, 0), ac, c) | out])
   end
 
-  defp dc_pixel(dc) do
-    v = 128 + Integer.floor_div(dc + 4, 8)
+  # A block's pixels: a tuple of `scale` rows of `scale` values each.
+  defp pixels(dc, [], %{scale: s}) do
+    row = List.duplicate(clamp(128 + Integer.floor_div(dc + 4, 8)), s)
+    List.to_tuple(List.duplicate(row, s))
+  end
 
-    cond do
-      v < 0 -> 0
-      v > 255 -> 255
-      true -> v
+  # The n-point IDCT, separable: along each coefficient row that has any,
+  # then down the columns. Fixed point: the basis carries @idct_bits, so a
+  # pixel's sum carries twice that, and the 1/4 of the 2-D IDCT.
+  defp pixels(dc, ac, %{scale: s, basis: basis}) do
+    xs = 0..(s - 1)
+
+    across =
+      [{0, 0, dc} | ac]
+      |> Enum.group_by(fn {v, _u, _val} -> v end, fn {_v, u, val} -> {u, val} end)
+      |> Enum.map(fn {v, uvals} ->
+        {v, for(x <- xs, do: row_sum(uvals, elem(basis, x), 0))}
+      end)
+
+    half = 1 <<< (2 * @idct_bits + 1)
+
+    for y <- xs do
+      ky = elem(basis, y)
+
+      across
+      |> Enum.reduce(List.duplicate(0, s), fn {v, gs}, sums ->
+        kv = elem(ky, v)
+        Enum.zip_with(sums, gs, &(&1 + kv * &2))
+      end)
+      |> Enum.map(&clamp(128 + ((&1 + half) >>> (2 * @idct_bits + 2))))
     end
+    |> List.to_tuple()
   end
 
-  defp block(bin, acc, n, dct, act) do
+  defp row_sum([], _kx, sum), do: sum
+  defp row_sum([{u, val} | rest], kx, sum), do: row_sum(rest, kx, sum + val * elem(kx, u))
+
+  # The DC difference and the AC coefficients the block's scale uses
+  # ({row, column, dequantized value}); the others are decoded to be skipped.
+  defp block(bin, acc, n, c) do
     {bin, acc, n} = fill(bin, acc, n)
-    {s, n} = symbol(acc, n, dct)
+    {s, n} = symbol(acc, n, c.dct)
     {diff, n} = extend(acc, n, s)
-    {bin, acc, n} = skip_ac(bin, acc, n, act, 1)
-    {diff, bin, acc, n}
+    {ac, bin, acc, n} = ac(bin, acc, n, c, 1, [])
+    {diff, ac, bin, acc, n}
   end
 
-  defp skip_ac(bin, acc, n, _act, k) when k > 63, do: {bin, acc, n}
+  defp ac(bin, acc, n, _c, k, kept) when k > 63, do: {kept, bin, acc, n}
 
-  defp skip_ac(bin, acc, n, act, k) do
+  defp ac(bin, acc, n, c, k, kept) do
     {bin, acc, n} = fill(bin, acc, n)
 
-    case symbol(acc, n, act) do
-      {0x00, n} -> {bin, acc, n}
-      {0xF0, n} -> skip_ac(bin, acc, n, act, k + 16)
-      {rs, n} -> skip_ac(bin, acc, n - (rs &&& 15), act, k + (rs >>> 4) + 1)
+    case symbol(acc, n, c.act) do
+      {0x00, n} ->
+        {kept, bin, acc, n}
+
+      {0xF0, n} ->
+        ac(bin, acc, n, c, k + 16, kept)
+
+      {rs, n} ->
+        k = k + (rs >>> 4)
+        size = rs &&& 15
+
+        if k <= 63 and used?(elem(@zigzag, k), c.used) do
+          {row, col} = elem(@zigzag, k)
+          {value, n} = extend(acc, n, size)
+          ac(bin, acc, n, c, k + 1, [{row, col, value * elem(c.q, k)} | kept])
+        else
+          ac(bin, acc, n - size, c, k + 1, kept)
+        end
     end
+  end
+
+  defp used?({row, col}, used), do: elem(used, row) and elem(used, col)
+
+  # A subsampled component is decoded at a larger scale, up to the luma's
+  # at full size, when its sampling divides evenly in both directions:
+  # libjpeg's rule (jdmaster.c) for nearest-sample upsampling, so the
+  # chroma keeps its own detail rather than being reduced twice.
+  defp component_scale(s, c, hmax, vmax, ssize \\ 1) do
+    if s * ssize <= 4 and rem(hmax, c.h * ssize * 2) == 0 and rem(vmax, c.v * ssize * 2) == 0,
+      do: component_scale(s, c, hmax, vmax, ssize * 2),
+      else: s * ssize
   end
 
   defp extend(_acc, n, 0), do: {0, n}
@@ -426,7 +556,7 @@ defmodule Bezalel.Images.Jpeg do
 
   defp push8(acc, n, b), do: (acc &&& (1 <<< n) - 1) <<< 8 ||| b
 
-  # -- 1/8 rows -------------------------------------------------------------
+  # -- pixel rows -----------------------------------------------------------
 
   defp emit_rows(mcus, comps, geo, rows, rs, sink) do
     planes =
@@ -449,31 +579,39 @@ defmodule Bezalel.Images.Jpeg do
 
   defp push_sink({fun, acc}, row), do: {fun, fun.(row, acc)}
 
-  # A component's block rows for one MCU row, as tuples of pixel values.
+  # A component's pixel rows for one MCU row (`scale` per block row), as
+  # tuples of pixel values.
   defp plane(mcus, i, c) do
-    for v <- 0..(c.v - 1) do
+    for v <- 0..(c.v - 1), r <- 0..(c.scale - 1) do
       mcus
-      |> Enum.flat_map(fn vals -> vals |> Enum.at(i) |> Enum.slice(v * c.h, c.h) end)
+      |> Enum.flat_map(fn vals ->
+        vals |> Enum.at(i) |> Enum.slice(v * c.h, c.h) |> Enum.flat_map(&elem(&1, r))
+      end)
       |> List.to_tuple()
     end
     |> List.to_tuple()
   end
 
-  defp pixel_row([y], _comps, geo, _oy) do
-    y |> elem(0) |> Tuple.to_list() |> Enum.take(geo.ow) |> :erlang.list_to_binary()
+  defp pixel_row([y], _comps, geo, oy) do
+    y |> elem(oy) |> Tuple.to_list() |> Enum.take(geo.ow) |> :erlang.list_to_binary()
   end
 
+  # Each component's pixels map onto the output by its share of the MCU:
+  # `c.v * c.scale` rows (and `c.h * c.scale` columns per MCU) for the
+  # output's `vmax * scale`; nearest sample.
   defp pixel_row([y, cb, cr], [yc, cbc, crc], geo, oy) do
-    ty = elem(y, div(oy * yc.v, geo.vmax))
-    tcb = elem(cb, div(oy * cbc.v, geo.vmax))
-    tcr = elem(cr, div(oy * crc.v, geo.vmax))
-    {hy, hcb, hcr, hmax} = {yc.h, cbc.h, crc.h, geo.hmax}
+    %{hmax: hmax, vmax: vmax, scale: s} = geo
+    ty = elem(y, div(oy * yc.v * yc.scale, vmax * s))
+    tcb = elem(cb, div(oy * cbc.v * cbc.scale, vmax * s))
+    tcr = elem(cr, div(oy * crc.v * crc.scale, vmax * s))
+    {hy, hcb, hcr} = {yc.h * yc.scale, cbc.h * cbc.scale, crc.h * crc.scale}
+    across = hmax * s
 
     for ox <- 0..(geo.ow - 1), into: <<>> do
       ycc(
-        elem(ty, div(ox * hy, hmax)),
-        elem(tcb, div(ox * hcb, hmax)),
-        elem(tcr, div(ox * hcr, hmax))
+        elem(ty, div(ox * hy, across)),
+        elem(tcb, div(ox * hcb, across)),
+        elem(tcr, div(ox * hcr, across))
       )
     end
   end

@@ -3,7 +3,7 @@ defmodule Bezalel.Images.CodecTest do
 
   import Bitwise
 
-  alias Bezalel.Images.{Codec, Png}
+  alias Bezalel.Images.{Codec, Jpeg, Png}
 
   @fixtures Path.expand("../../fixtures/images", __DIR__)
 
@@ -272,39 +272,82 @@ defmodule Bezalel.Images.CodecTest do
     defp near?(actual, expected),
       do: Enum.zip(actual, expected) |> Enum.all?(fn {a, e} -> abs(a - e) <= 24 end)
 
-    test "baseline with 4:2:0, 4:2:2, 4:4:4 and restart markers decodes at 1/8 scale" do
+    test "baseline with 4:2:0, 4:2:2, 4:4:4 and restart markers, at 1/8 and at full scale" do
       for name <- ~w(quads_420.jpg quads_422.jpg quads_444.jpg quads_restart.jpg) do
+        # 160x120 into its 1/8 size: DC values only.
         assert {:ok, %{width: 20, height: 15, mime: "image/png"} = t} =
-                 Codec.thumbnail(fixture(name), 100, 100)
+                 Codec.thumbnail(fixture(name), 20, 15)
 
         assert near?(rgb_at(t, 2, 2), [255, 0, 0]), name
         assert near?(rgb_at(t, 17, 2), [0, 255, 0]), name
         assert near?(rgb_at(t, 2, 12), [0, 0, 255]), name
         assert near?(rgb_at(t, 17, 12), [255, 255, 255]), name
+
+        # Into 100x100: 100x75, from the full-scale decode box-downscaled.
+        assert {:ok, %{width: 100, height: 75} = t} = Codec.thumbnail(fixture(name), 100, 100)
+        assert near?(rgb_at(t, 10, 10), [255, 0, 0]), name
+        assert near?(rgb_at(t, 90, 10), [0, 255, 0]), name
+        assert near?(rgb_at(t, 10, 65), [0, 0, 255]), name
+        assert near?(rgb_at(t, 90, 65), [255, 255, 255]), name
       end
     end
 
-    test "1/8 image still too large is box-downscaled" do
-      assert {:ok, %{width: 10, height: 8} = t} =
-               Codec.thumbnail(fixture("quads_420.jpg"), 10, 10)
+    test "the decode scale is the smallest whose result covers the picture's size" do
+      # A 3000x2000 photo: the chat's 996x664 needs 1/2 (1500x1000), 1/4
+      # (750x500) would be upscaled; the viewer's 2160x1440 needs 1/1.
+      assert Jpeg.scale(3000, 2000, 996, 664) == 4
+      assert Jpeg.scale(3000, 2000, 2160, 1440) == 8
+      assert Jpeg.scale(3000, 2000, 375, 250) == 1
+      assert Jpeg.scale(3000, 2000, 376, 250) == 2
+      # Both dimensions must be covered; partial blocks round up.
+      assert Jpeg.scale(3000, 2000, 300, 251) == 2
+      assert Jpeg.scale(161, 121, 21, 16) == 1
+    end
 
-      assert near?(rgb_at(t, 0, 0), [255, 0, 0])
-      assert near?(rgb_at(t, 9, 7), [255, 255, 255])
+    test "each scale's pixels match libjpeg-turbo's scaled IDCT" do
+      # libjpeg-turbo 3.1's decodes of each fixture at 1/8, 1/4, 1/2 and
+      # 1/1, as PNGs: detail_444.jpg (64x48, 4:4:4) through Pillow's draft
+      # mode; detail_420.jpg (61x45, 4:2:0, partial MCUs) through
+      # `djpeg -scale S -nosmooth` (nearest-sample chroma, as here; the
+      # chroma is decoded at twice the luma's scale up to full size).
+      cases = [
+        {"detail_444", [{8, 6}, {16, 12}, {32, 24}, {64, 48}]},
+        {"detail_420", [{8, 6}, {16, 12}, {31, 23}, {61, 45}]}
+      ]
+
+      for {name, sizes} <- cases, {w, h} <- sizes do
+        assert {:ok, %{width: ^w, height: ^h, data: data}} =
+                 Jpeg.thumbnail(fixture(name <> ".jpg"), w, h)
+
+        {:ok, %{pixels: ours}} = Png.decode(data)
+        {:ok, %{pixels: theirs}} = Png.decode(fixture("#{name}_#{w}x#{h}.png"))
+
+        diffs =
+          Enum.zip_with(:binary.bin_to_list(ours), :binary.bin_to_list(theirs), &abs(&1 - &2))
+
+        mean = Enum.sum(diffs) / length(diffs)
+        assert Enum.max(diffs) <= 3, "#{name} #{w}x#{h}: max difference #{Enum.max(diffs)}"
+        assert mean < 0.5, "#{name} #{w}x#{h}: mean #{mean}"
+      end
     end
 
     test "grayscale" do
       assert {:ok, %{format: :jpeg, width: 96, height: 64}} = Codec.info(fixture("gray.jpg"))
-      assert {:ok, %{width: 12, height: 8} = t} = Codec.thumbnail(fixture("gray.jpg"), 50, 50)
+      assert {:ok, %{width: 12, height: 8} = t} = Codec.thumbnail(fixture("gray.jpg"), 12, 8)
       assert near?(rgb_at(t, 1, 4), [40, 40, 40])
       assert near?(rgb_at(t, 10, 4), [200, 200, 200])
+      assert {:ok, %{width: 50, height: 33} = t} = Codec.thumbnail(fixture("gray.jpg"), 50, 50)
+      assert near?(rgb_at(t, 4, 16), [40, 40, 40])
+      assert near?(rgb_at(t, 45, 16), [200, 200, 200])
     end
 
     test "EXIF orientation 6 is applied to info and thumbnail" do
       # Stored 160x80, left half red, right half blue; displayed rotated 90 CW.
       assert {:ok, %{width: 80, height: 160}} = Codec.info(fixture("orient6.jpg"))
-      assert {:ok, %{width: 10, height: 20} = t} = Codec.thumbnail(fixture("orient6.jpg"), 50, 50)
-      assert near?(rgb_at(t, 5, 2), [255, 0, 0])
-      assert near?(rgb_at(t, 5, 17), [0, 0, 255])
+      # Displayed 25x50 is stored 50x25: the 1/2 decode (80x40) covers it.
+      assert {:ok, %{width: 25, height: 50} = t} = Codec.thumbnail(fixture("orient6.jpg"), 50, 50)
+      assert near?(rgb_at(t, 12, 5), [255, 0, 0])
+      assert near?(rgb_at(t, 12, 45), [0, 0, 255])
     end
 
     test "progressive is left to the platform" do

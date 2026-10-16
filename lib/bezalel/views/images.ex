@@ -66,7 +66,9 @@ defmodule Bezalel.Views.Images do
     avail = screen_w - 32
 
     case Map.get(assigns.images, {key, :chat}) do
-      {:ok, %{path: path, width: w, height: h}} ->
+      # Sized by the original, at one pixel per screen pixel, to fit the
+      # chat: a file decoded smaller than its box is drawn as big.
+      {:ok, %{path: path, original: {w, h}}} ->
         {dw, dh} = fit(w / screen.scale, h / screen.scale, avail, 420)
         tap = {self(), {:image, {:open, key}}}
 
@@ -134,9 +136,9 @@ defmodule Bezalel.Views.Images do
 
     body =
       case ready do
-        %{path: path, width: w, height: h} ->
+        %{path: path, original: {w, h}} ->
+          # Fitted to the screen by the original's size (whatever the file's).
           {fw, fh} = fit(w, h, screen.width, screen.height - sa.top - sa.bottom - 56)
-          # The picture's pixels at 1×: never blown up past twice that.
           {dw, dh} = {Float.round(fw * zoom, 1), Float.round(fh * zoom, 1)}
 
           ~MOB"""

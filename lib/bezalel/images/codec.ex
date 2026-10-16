@@ -9,8 +9,9 @@ defmodule Bezalel.Images.Codec do
       `format: :unknown` with its size.
     * `thumbnail/3` fits an image inside a box (aspect kept, never
       upscaled), using area averaging. PNG is decoded in a streaming pass
-      (`Bezalel.Images.Png`); baseline JPEG at 1/8 scale from DC
-      coefficients only (`Bezalel.Images.Jpeg`). Output is always an 8-bit
+      (`Bezalel.Images.Png`); baseline JPEG at the smallest of 1/8,
+      1/4, 1/2 and 1/1 scale that covers the box, by a scaled IDCT
+      (`Bezalel.Images.Jpeg`). Output is always an 8-bit
       PNG, RGBA when the source has alpha.
 
   Anything already inside the box, or a format/variant that can't be
