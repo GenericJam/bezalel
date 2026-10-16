@@ -13,6 +13,7 @@ defmodule Bezalel.Views.Workshop do
   alias Bezalel.Workshop.Host
   alias Mob.Socket
   alias MobBezalel.{Icons, Palette, UI}
+  alias Rho.Dyn.Compiler
 
   @starters ["Sermon outline helper", "Word study view", "Reading plan"]
   @diff_shown 6_000
@@ -352,8 +353,8 @@ defmodule Bezalel.Views.Workshop do
            "Its code leaves your phone, and the study agent stops offering it. The shelf entry goes too."},
         else:
           {"Add #{if names == "", do: "this change", else: names} to Bezalel?",
-           "It runs on your phone and can read your study library, and nothing else: no " <>
-             "network, no files, not your conversations or settings. Until it has run a " <>
+           "It runs on your phone. It’s written to read only your study library and draw " <>
+             "on the screen, and Bezalel checks its code before it runs. Until it has run a " <>
              "minute and the app has restarted, it’s on probation: if it crashes three " <>
              "times in a minute, Bezalel takes it back out and puts back what was there before."}
 
@@ -624,6 +625,7 @@ defmodule Bezalel.Views.Workshop do
   @doc """
   Opens `tool`'s panel: a Workshop tool's screen gets a host process
   (`Bezalel.Workshop.Host`) when its code runs. Any previous host stops.
+  `tool_screen` keeps which version of the screen it runs and its module.
   """
   def open_panel(socket, tool) do
     socket = close_panel(socket)
@@ -636,25 +638,52 @@ defmodule Bezalel.Views.Workshop do
         move_open: 0
       )
 
+    case screen_module(tool) do
+      nil ->
+        socket
+
+      module ->
+        {pid, ref} = Host.start(self(), module, socket.__mob__.platform, socket.assigns)
+
+        Socket.assign(socket,
+          tool_host: %{pid: pid, ref: ref},
+          tool_view: :opening,
+          tool_screen: {tool.data["generation"], module}
+        )
+    end
+  end
+
+  # The module of `tool`'s screen in the running generation.
+  defp screen_module(tool) do
     with %{kind: "dyn", data: %{"screen" => screen}} when is_binary(screen) <- tool,
          {:ok, module} <- Rho.Dyn.lookup({:screen, screen}) do
-      {pid, ref} =
-        Host.start(self(), module, socket.__mob__.platform, socket.assigns)
-
-      Socket.assign(socket, tool_host: %{pid: pid, ref: ref}, tool_view: :opening)
+      module
     else
-      _ -> socket
+      _ -> nil
     end
+  end
+
+  # Whether the open panel runs `tool`'s screen as it is now: the same
+  # version (the shelf row's generation, Bezalel.Workshop.reconcile/0), not
+  # a module of a generation just reverted (`reverted`). Not by module alone:
+  # every generation renames all of its modules (`Dyn.G<n>.*`), unchanged
+  # ones included, so another tool's activation would restart the panel.
+  defp current?(tool, nil, _reverted), do: screen_module(tool) == nil
+
+  defp current?(tool, {version, module}, reverted) do
+    screen_module(tool) != nil and tool.data["generation"] == version and
+      Compiler.generation_of(module) != reverted
   end
 
   @doc "Stops the open panel's screen host, if any."
   def close_panel(%{assigns: %{tool_host: %{pid: pid, ref: ref}}} = socket) do
     Process.demonitor(ref, [:flush])
     :ok = Host.stop(pid)
-    Socket.assign(socket, tool_host: nil, tool_view: nil)
+    Socket.assign(socket, tool_host: nil, tool_view: nil, tool_screen: nil)
   end
 
-  def close_panel(socket), do: Socket.assign(socket, tool_host: nil, tool_view: nil)
+  def close_panel(socket),
+    do: Socket.assign(socket, tool_host: nil, tool_view: nil, tool_screen: nil)
 
   @doc "The panel's host painted (stale hosts' views are dropped)."
   def host_view(pid, tree, %{assigns: %{tool_host: %{pid: pid}}} = socket),
@@ -662,15 +691,13 @@ defmodule Bezalel.Views.Workshop do
 
   def host_view(_pid, _tree, socket), do: socket
 
-  @doc "A monitored process went down: the panel's host, if it is its monitor."
-  def host_down(ref, reason, %{assigns: %{tool_host: %{ref: ref}}} = socket) do
-    view =
-      if reason in [:normal, :shutdown],
-        do: nil,
-        else: {:crashed, reason |> Exception.format_exit() |> String.slice(0, 600)}
-
-    Socket.assign(socket, tool_host: nil, tool_view: view)
-  end
+  @doc """
+  A monitored process went down: the panel's host, if it is its monitor.
+  The host describes its own crash (`Bezalel.Workshop.Host.outcome/1`), so
+  no code of the screen's runs here.
+  """
+  def host_down(ref, reason, %{assigns: %{tool_host: %{ref: ref}}} = socket),
+    do: Socket.assign(socket, tool_host: nil, tool_view: Host.outcome(reason))
 
   def host_down(_ref, _reason, socket), do: socket
 
@@ -700,7 +727,7 @@ defmodule Bezalel.Views.Workshop do
     :ok = Bezalel.Workshop.reconcile()
 
     socket
-    |> refresh_tools()
+    |> refresh_tools(from)
     |> Helpers.toast(
       "#{who} crashed (#{event[:reason] || "repeatedly"}), so Bezalel put back " <>
         "the version before it."
@@ -718,16 +745,25 @@ defmodule Bezalel.Views.Workshop do
 
   def dyn_event(_event, socket), do: socket
 
-  # The Workshop's statuses, and the open panel (its screen may have gone
-  # or changed version).
-  defp refresh_tools(%{assigns: %{tab: :tool, tool: tool}} = socket) do
+  # The Workshop's statuses, and the open panel: reopened only if the
+  # version of the screen it runs changed or went (a change, a revert), or
+  # it runs code of a reverted generation, so another tool's activation or
+  # this one's proving doesn't restart it.
+  defp refresh_tools(socket, reverted \\ nil)
+
+  defp refresh_tools(%{assigns: %{tab: :tool, tool: tool}} = socket, reverted) do
     case Library.get_tool(tool.id) do
-      nil -> Helpers.go(socket, :workshop)
-      tool -> open_panel(socket, tool)
+      nil ->
+        Helpers.go(socket, :workshop)
+
+      tool ->
+        if current?(tool, socket.assigns.tool_screen, reverted),
+          do: Socket.assign(socket, tool: tool, tool_state: Workshop.status(tool)),
+          else: open_panel(socket, tool)
     end
   end
 
-  defp refresh_tools(socket), do: Helpers.refresh(socket)
+  defp refresh_tools(socket, _reverted), do: Helpers.refresh(socket)
 
   # ── Events ────────────────────────────────────────────────────────────────
 

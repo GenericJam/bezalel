@@ -43,6 +43,10 @@ defmodule Bezalel.AppScreen do
     # Built tools' activations, crashes and reverts (the Workshop shows
     # them; a revert also says so wherever the user is).
     :ok = Rho.Dyn.subscribe()
+    # The Workshop's shelf follows the generation that runs, which a revert
+    # may have changed with nobody listening: at boot (a launch that died)
+    # or while this screen was down. Subscribed first, so none is missed.
+    :ok = Bezalel.Workshop.reconcile()
 
     conversation = Library.get_conversation(Settings.conversation_id()) || Library.seed!()
 
@@ -78,6 +82,7 @@ defmodule Bezalel.AppScreen do
         move_open: 0,
         tool_host: nil,
         tool_view: nil,
+        tool_screen: nil,
         tool_state: nil,
         tool_status: %{},
         change_of: nil,

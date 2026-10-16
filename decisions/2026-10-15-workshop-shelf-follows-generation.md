@@ -1,7 +1,9 @@
 # The Workshop's shelf follows the generation that runs
 - Date: 2026-10-15
 - Status: accepted (bezalel-qyv.1); refines the persistence part of
-  2026-10-15-workshop-on-dyn.md
+  2026-10-15-workshop-on-dyn.md. Where it runs at start is refined by
+  2026-10-15-workshop-panel-sandbox.md (`AppScreen.mount/3`, not
+  `App.on_start`).
 
 ## Context
 The shelf (`tools` rows of kind `"dyn"`) recorded each tool as of its last

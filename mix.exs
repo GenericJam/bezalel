@@ -38,7 +38,7 @@ defmodule Bezalel.MixProject do
       {:exqlite, "~> 0.42"},
       # The agent core: models, sign-in, usage, Dyn. Pinned to a commit until
       # rho is on Hex.
-      sibling(:rho, "GenericJam/rho", "eb1026b361de43ee158157008a585bbefc9cfa83"),
+      sibling(:rho, "GenericJam/rho", "3c2dca84ae1de47485f83666f7925f4c2fcee2b8"),
       # The platform secure store (Keychain / Keystore) rho keeps the
       # sign-ins and API keys in. Unreleased: pinned to a commit.
       sibling(

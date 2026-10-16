@@ -147,6 +147,13 @@ Things that already bit this app. Not optional.
    `MOB_SIM_RUNTIME_DIR=/tmp/<you>-ios-runtime` whenever another agent might
    use a simulator, and prove the build on the node after a deploy.
 
+10. **Don't promise a sandbox for built tools.** rho's Dyn check and the
+   panel host are a best-effort guard against the model's mistakes, not
+   against hostile code (Kevin, 2026-10-15). Copy and docs say what's
+   checked ("written to read only your study library and draw on screen;
+   checked before it runs; put back if it keeps crashing"), never "safe" or
+   "no network" outright.
+
 ## Tests are part of the change
 
 New behaviour ships with a test unless a test would only restate the change
@@ -360,12 +367,19 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   sheet activates it (`Rho.Dyn.Approval.Biometric` fed by the tap), it runs
   on probation (three crashes in a minute revert it; the Workshop says so).
   Built code may call only `Bezalel.Workshop.Study` of Bezalel (read-only
-  study data) and Mob's/MobBezalel's drawing modules: no network, no
-  storage. A tool's screen runs in its own process in the panel
-  (`Bezalel.Workshop.Host`). Without a model it's still the storyboard
-  sample. Generations live in `dyn/` under rho's data dir; the shelf
-  (`tools` rows, one version per approved change) follows the generation
-  that runs (`Bezalel.Workshop.reconcile/0`, at app start and on every
+  study data) and Mob's/MobBezalel's drawing modules (network and storage
+  modules are on the check's deny-list). The check is rho's best-effort guard
+  against the model's mistakes, not a sandbox against hostile code (Kevin,
+  2026-10-15; decisions/2026-10-15-workshop-on-dyn.md): copy never promises
+  "no network" or "safe", only what's checked. A tool's screen runs in its own process in the panel
+  (`Bezalel.Workshop.Host`), which sends the app plain data only: no web
+  views, videos or remote images (an image's `src` must be an on-phone
+  path), its crashes described in its own process
+  (decisions/2026-10-15-workshop-panel-sandbox.md). Without a model it's
+  still the storyboard sample. Generations live in `dyn/` under rho's data
+  dir; the shelf (`tools` rows, one version per approved change) follows
+  the generation that runs (`Bezalel.Workshop.reconcile/0`, when the app's
+  screen mounts and on every
   revert), so a reverted change or Remove shows what runs again. Tests:
   `test/bezalel/workshop_dyn_test.exs`; tests that build tools move the
   Keeper to their own dir (`test/support/dyn.ex`). On a device, let the

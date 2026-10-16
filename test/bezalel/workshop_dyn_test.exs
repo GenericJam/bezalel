@@ -15,6 +15,8 @@ defmodule Bezalel.WorkshopDynTest do
   alias Bezalel.Library.{Conversation, Tool}
   alias Bezalel.Test.{Dyn, FakeLLM, MemoryStore}
   alias Bezalel.Workshop.{Builder, Host, Prompt}
+  alias Rho.Dyn.Approval.Biometric
+  alias Rho.Dyn.Compiler
 
   setup %{tmp_dir: dir} do
     for schema <- [Tool, Conversation], do: Repo.delete_all(schema)
@@ -195,6 +197,149 @@ defmodule Bezalel.WorkshopDynTest do
     end
   end
 
+  # A tool, Probe, whose screen tries what a panel must not let through:
+  # web content and remote images, a struct of its own in the view, an
+  # exception (and an exit through a link) whose message/1 and Inspect
+  # implementation report the process they run in, a view Mob can't draw,
+  # and trapping exits while busy.
+  defp probe do
+    """
+    defmodule Bezalel.Dyn.Probe do
+      @behaviour Rho.Tool
+      def name, do: "probe"
+      def description, do: "A probe."
+      def parameter_schema, do: %{"type" => "object", "properties" => %{}}
+      def run(_args, _ctx), do: {:ok, "probe"}
+      def selftest, do: :ok
+    end
+
+    defmodule Bezalel.Dyn.Probe.Hostile do
+      defexception message: "hostile", loop: false
+
+      def message(%{loop: true} = e), do: message(e)
+
+      def message(_e) do
+        send(self(), {:hostile, :message})
+        "hostile message"
+      end
+
+      defimpl Inspect do
+        def inspect(_e, _opts) do
+          send(self(), {:hostile, :inspect})
+          "#Hostile<>"
+        end
+      end
+    end
+
+    defmodule Bezalel.Dyn.Probe.Block do
+      defstruct [:src]
+    end
+
+    defmodule Bezalel.Dyn.Probe.Screen do
+      use Mob.Screen
+      alias Bezalel.Dyn.Probe.{Block, Hostile}
+
+      # A list renderer that returns a list: left unexpanded, never drawn.
+      def mount(_params, _session, socket) do
+        socket =
+          socket
+          |> Mob.Socket.assign(lines: nil, taps: 0)
+          |> Mob.List.put_renderer(:outer, fn _item ->
+            %{type: :list, props: %{id: :inner, items: [%{label: %{a: 1}}]}, children: []}
+          end)
+
+        {:ok, socket}
+      end
+
+      def handle_info({:tap, :raise}, _socket), do: raise(Hostile)
+      def handle_info({:tap, :raise_loop}, _socket), do: raise(Hostile, loop: true)
+
+      def handle_info({:tap, :forged_crash}, socket) do
+        Process.exit(self(), {:rho_crash, <<255, 104>> <> String.duplicate("x", 100_000)})
+        {:noreply, socket}
+      end
+
+      def handle_info({:tap, :improper}, socket) do
+        spawn_link(fn -> exit({%Hostile{}, [:a | :b]}) end)
+        Process.sleep(5_000)
+        {:noreply, socket}
+      end
+
+      def handle_info({:tap, :link}, socket) do
+        spawn_link(fn -> exit({%Hostile{}, [{__MODULE__, :link, 0, []}]}) end)
+        Process.sleep(5_000)
+        {:noreply, socket}
+      end
+
+      def handle_info({:tap, :bad_view}, socket),
+        do: {:noreply, Mob.Socket.assign(socket, :lines, 0)}
+
+      def handle_info({:tap, :many_taps}, socket),
+        do: {:noreply, Mob.Socket.assign(socket, :taps, 2_100)}
+
+      def handle_info({:tap, :spin}, _socket) do
+        Process.flag(:trap_exit, true)
+        spin()
+      end
+
+      def handle_info(_message, socket), do: {:noreply, socket}
+
+      defp spin, do: spin()
+
+      def render(assigns) do
+        ~MOB\"\"\"
+        <Column>
+          <Text text="probe" max_lines={@lines} tag={%Hostile{}} />
+          <WebView url="https://example.com/web" />
+          <Video src="https://example.com/v.mp4" />
+          <Image src="https://example.com/i.png?q=secret" />
+          <Image src="HTTP://example.com/caps.png" />
+          <Image src="ftp://example.com/f.png" />
+          <Image src="data:image/png;base64,AAAA" />
+          <Image src="/data/local/a.png" />
+          <Image src="/data/local/b.png" ios={%{src: "https://example.com/ios.png"}} />
+          {%{type: :image, props: %{style: %Mob.Style{props: %{src: "https://example.com/s.png"}}}, children: []}}
+          {%{type: :image, props: %{"src" => "https://example.com/str.png"}, children: []}}
+          <Image src="/data/local/c.png" android={%Block{src: "https://example.com/and.png"}} />
+          {%{type: :image, props: %{style: %Mob.Style{props: %{ios: %Block{src: "https://example.com/sb.png"}}}}, children: []}}
+          <Image src={:"https://example.com/atom.png"} />
+          {%{type: :list, props: %{id: :outer, items: [1]}, children: []}}
+          {for _ <- 1..@taps//1, do: %{type: :button, props: %{text: "b", on_tap: {self(), :b}}, children: []}}
+        </Column>
+        \"\"\"
+      end
+    end
+    """
+  end
+
+  # Approves the probe (generation 1) and opens its panel.
+  defp open_probe do
+    [tool] = %{"probe.ex" => probe()} |> Dyn.propose!() |> approve!()
+
+    AppScreen
+    |> mount_screen()
+    |> render_info({:tap, {:workshop, {:open_tool, tool.id}}})
+    |> painted()
+  end
+
+  # Sends the panel's host `tap` and hands the screen the host's exit.
+  defp host_exits(view, tap) do
+    %{pid: pid, ref: ref} = assigns(view).tool_host
+    send(pid, {:tap, tap})
+    assert_receive {:DOWN, ^ref, :process, ^pid, reason}, 5_000
+    {render_info(view, {:DOWN, ref, :process, pid, reason}), reason}
+  end
+
+  defp nodes(%{type: _, props: _, children: kids} = node),
+    do: [node | Enum.flat_map(kids, &nodes/1)]
+
+  defp structs(%Mob.Style{props: props}), do: structs(props)
+  defp structs(%_{} = struct), do: [struct]
+  defp structs(%{} = map), do: Enum.flat_map(map, fn {k, v} -> structs(k) ++ structs(v) end)
+  defp structs(list) when is_list(list), do: Enum.flat_map(list, &structs/1)
+  defp structs(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> structs()
+  defp structs(_term), do: []
+
   test "a live build writes a tool and its screen; nothing runs until approved; then the panel draws it and the study agent calls it" do
     builds(word_frequency())
     view = AppScreen |> mount_screen() |> render_info({:tap, {:tab, :workshop}})
@@ -291,7 +436,8 @@ defmodule Bezalel.WorkshopDynTest do
           {~s|Req.get!("https://example.com")|, "Req"},
           {~s|Exqlite.Sqlite3.open("x")|, "Exqlite"},
           {"Mob.State.put(:bezalel_model, 1)", "Mob.State"},
-          {~s|:mob_nif.open_url("https://example.com")|, "mob_nif"}
+          {~s|:mob_nif.open_url("https://example.com")|, "mob_nif"},
+          {~s|Mob.UI.webview(url: "https://example.com")|, "Mob.UI"}
         ] do
       :ok = Rho.Dyn.stage_reset()
 
@@ -399,6 +545,226 @@ defmodule Bezalel.WorkshopDynTest do
     assert_receive {:DOWN, ^ref, :process, ^host, :normal}, 5_000
   end
 
+  test "a panel doesn't reach the network: web views, videos and remote images aren't drawn; on-phone images are" do
+    view = open_probe()
+    {:view, tree} = assigns(view).tool_view
+    nodes = nodes(tree)
+
+    refute Enum.any?(nodes, &(&1.type in [:web_view, :video]))
+    refute inspect(tree) =~ "example.com"
+
+    # Two notes (web view, video), and one for the list a list renderer
+    # returned: left unexpanded, it isn't drawn, so the app's screen never
+    # expands (and runs) it.
+    assert [_, _, _] =
+             for(
+               %{type: :text, props: %{text: text}} <- nodes,
+               text =~ "can't be drawn",
+               do: text
+             )
+
+    refute Enum.any?(nodes, &(&1.type == :list))
+    assert Mob.List.expand(tree, %{}, self()) == tree
+
+    # Remote (any scheme) srcs are dropped, also from platform blocks (maps
+    # or structs), styles (also their platform blocks) and string keys, and
+    # atoms (they reach native as their names); on-phone paths stay.
+    assert for(%{type: :image, props: props} <- nodes, do: props) == [
+             %{},
+             %{},
+             %{},
+             %{},
+             %{src: "/data/local/a.png"},
+             %{src: "/data/local/b.png", ios: %{}},
+             %{style: %Mob.Style{props: %{}}},
+             %{},
+             %{src: "/data/local/c.png", android: %{}},
+             %{style: %Mob.Style{props: %{ios: %{}}}},
+             %{}
+           ]
+
+    # The view the app draws holds no struct of the screen's.
+    assert structs(tree) == []
+  end
+
+  test "a panel with more controls than its share of the frame's tap handles crashes its host" do
+    {view, _reason} = open_probe() |> host_exits(:many_taps)
+    assert {:crashed, why} = assigns(view).tool_view
+    assert why =~ "a tool's panel holds at most 2048"
+  end
+
+  test "a screen's exception is described in its own process: the app's screen never runs its message/1 or Inspect" do
+    view = open_probe()
+
+    # An exit that reaches the host through a link, which it can't describe:
+    # inspected here without protocols. (The screen's message/1 and Inspect
+    # send to self(): nothing of them may arrive here.)
+    {view, reason} = host_exits(view, :link)
+    refute_received {:hostile, _}
+    assert {%{__exception__: true}, [_]} = reason
+    assert {:crashed, "It exited: " <> raw} = assigns(view).tool_view
+    assert raw =~ "Probe.Hostile"
+    assert %{type: :crash, gen: 1} = Dyn.await(:crash)
+
+    # A raise: the host describes it (message/1 runs in its helper) and
+    # exits with the text, which the Keeper reports as it is.
+    view = view |> render_info({:tap, {:tool, :reopen}}) |> painted()
+    {view, reason} = host_exits(view, :raise)
+    refute_received {:hostile, _}
+    assert {:rho_crash, text} = reason
+    assert {:crashed, ^text} = assigns(view).tool_view
+    assert text =~ "hostile message"
+    assert %{type: :crash, gen: 1, reason: ^text} = Dyn.await(:crash)
+
+    # A message/1 that never returns: the host still exits, in about a
+    # second, with the exception described.
+    view = view |> render_info({:tap, {:tool, :reopen}}) |> painted()
+    {view, {:rho_crash, text}} = host_exits(view, :raise_loop)
+    assert text =~ ~r/^\*\* \(Bezalel\.Dyn\.G1\.Probe\.Hostile\) hostile/
+    assert {:crashed, ^text} = assigns(view).tool_view
+    refute_received {:hostile, _}
+  end
+
+  test "a host that exits with an improper stack through a link is a crash; the Keeper and the app's screen stay up" do
+    keeper = Process.whereis(Rho.Dyn.Keeper)
+    {view, {%{__exception__: true}, [:a | :b]}} = open_probe() |> host_exits(:improper)
+
+    assert {:crashed, "It exited: ** (Bezalel.Dyn.G1.Probe.Hostile) hostile" <> _} =
+             assigns(view).tool_view
+
+    assert %{type: :crash, gen: 1, reason: "** (Bezalel.Dyn.G1.Probe.Hostile) hostile" <> _} =
+             Dyn.await(:crash)
+
+    assert Process.whereis(Rho.Dyn.Keeper) == keeper
+    refute_received {:hostile, _}
+  end
+
+  test "crash text a screen forges itself reaches the panel capped and valid" do
+    {view, {:rho_crash, _}} = open_probe() |> host_exits(:forged_crash)
+    assert {:crashed, text} = assigns(view).tool_view
+    assert String.valid?(text) and byte_size(text) <= 600
+  end
+
+  test "the helper describing a crash dies with the host" do
+    view = open_probe()
+    %{pid: host} = assigns(view).tool_host
+    send(host, {:tap, :raise_loop})
+    helper = await_helper(host)
+    ref = Process.monitor(helper)
+    Process.exit(host, :kill)
+    assert_receive {:DOWN, ^ref, :process, ^helper, :killed}, 1_000
+  end
+
+  # The process the host monitors besides its owner (this test): its
+  # describing helper.
+  defp await_helper(host, tries \\ 100) do
+    {:monitors, monitors} = Process.info(host, :monitors)
+
+    case for({:process, pid} <- monitors, pid != self(), do: pid) do
+      [helper] -> helper
+      _ when tries > 0 -> Process.sleep(10) && await_helper(host, tries - 1)
+      _ -> flunk("the host never started a helper")
+    end
+  end
+
+  test "after a revert, an open panel running the reverted generation's code reopens on the version that runs" do
+    [tool] = word_frequency() |> then(&Dyn.propose!(%{"word_frequency.ex" => &1})) |> approve!()
+    :ok = Rho.Dyn.subscribe()
+
+    # Generation 2 adds another tool; this one's version (its row's) stays 1.
+    [_probe] =
+      %{"word_frequency.ex" => word_frequency(), "probe.ex" => probe()}
+      |> Dyn.propose!()
+      |> approve!()
+
+    view =
+      AppScreen
+      |> mount_screen()
+      |> render_info({:tap, {:workshop, {:open_tool, tool.id}}})
+      |> painted()
+
+    pid = host(view)
+    {1, module} = assigns(view).tool_screen
+    assert Compiler.generation_of(module) == 2
+
+    :ok = Biometric.confirm({:revert_to, 1})
+    {:ok, token} = Rho.Dyn.request_approval({:revert_to, 1})
+    assert {:ok, _} = Rho.Dyn.revert_to(1, token)
+    assert %{from: 2, to: 1} = reverted = Dyn.await(:reverted)
+    view = view |> render_info({:rho_dyn, reverted}) |> painted()
+
+    refute host(view) == pid
+    {1, module} = assigns(view).tool_screen
+    assert Compiler.generation_of(module) == 1
+    assert text(view) =~ "MOST FREQUENT WORDS"
+  end
+
+  test "a view Mob can't draw crashes the panel's host, not the app's frame" do
+    {view, _reason} = open_probe() |> host_exits(:bad_view)
+    assert {:crashed, why} = assigns(view).tool_view
+    assert why =~ "max_lines must be an integer"
+    assert text(view) =~ "IT STOPPED WITH AN ERROR"
+  end
+
+  test "a host whose owner exits is killed even while it traps exits in a busy callback, and that's no crash" do
+    [_tool] = %{"probe.ex" => probe()} |> Dyn.propose!() |> approve!()
+    {:ok, module} = Rho.Dyn.lookup({:screen, "Probe.Screen"})
+    :ok = Rho.Dyn.subscribe()
+    owner = spawn(fn -> receive do: (:stop -> :ok) end)
+    {host, ref} = Host.start(owner, module, :android, %{})
+    send(host, {:tap, :spin})
+    await_trapping(host)
+
+    send(owner, :stop)
+    assert_receive {:DOWN, ^ref, :process, ^host, :killed}, 2_000
+    refute_receive {:rho_dyn, %{type: :crash}}, 300
+  end
+
+  defp await_trapping(pid, tries \\ 100) do
+    cond do
+      Process.info(pid, :trap_exit) == {:trap_exit, true} -> :ok
+      tries == 0 -> flunk("the screen never trapped exits")
+      true -> Process.sleep(10) && await_trapping(pid, tries - 1)
+    end
+  end
+
+  test "the open panel restarts only when its tool's version changes, not for another tool's activation" do
+    [tool] = word_frequency() |> then(&Dyn.propose!(%{"word_frequency.ex" => &1})) |> approve!()
+    :ok = Rho.Dyn.subscribe()
+
+    view =
+      AppScreen
+      |> mount_screen()
+      |> render_info({:tap, {:workshop, {:open_tool, tool.id}}})
+      |> painted()
+
+    pid = host(view)
+
+    # Another tool is added (generation 2) and proven: the panel keeps running.
+    [_probe] =
+      %{"word_frequency.ex" => word_frequency(), "probe.ex" => probe()}
+      |> Dyn.propose!()
+      |> approve!()
+
+    view = render_info(view, {:rho_dyn, Dyn.await(:activated)})
+    view = render_info(view, {:rho_dyn, %{type: :proven, gen: 2}})
+    assert host(view) == pid
+    assert Process.alive?(pid)
+
+    # This tool changes (generation 3): the panel runs the new version.
+    n =
+      Dyn.propose!(%{
+        "word_frequency.ex" => word_frequency(heading: "Word counts"),
+        "probe.ex" => probe()
+      })
+
+    {:ok, {:review, review}} = Workshop.review(n, %{description: "Word counts"})
+    assert {:ok, _} = Workshop.approve(review)
+    view = view |> render_info({:rho_dyn, Dyn.await(:activated)}) |> painted()
+    refute host(view) == pid
+    assert text(view) =~ "WORD COUNTS"
+  end
+
   test "an approved tool is still there after the app restarts" do
     [tool] = word_frequency() |> then(&Dyn.propose!(%{"word_frequency.ex" => &1})) |> approve!()
     assert %{generation: 1, mode: :normal, reverted: nil} = Dyn.relaunch()
@@ -455,8 +821,10 @@ defmodule Bezalel.WorkshopDynTest do
 
     assert %{reverted: %{from: 2, to: 1}} = Dyn.relaunch_after_crash()
     assert [{"word_frequency", _}] = Rho.Dyn.tools()
-    # What the app does at start (Bezalel.App.on_start).
-    :ok = Workshop.reconcile()
+    assert Library.list_tools() == []
+
+    # The app's screen mounting at start puts the shelf in line.
+    view = mount_screen(AppScreen)
 
     assert [%Tool{id: id, description: "A word-frequency card"} = back] = Library.list_tools()
     assert id == tool.id
@@ -464,7 +832,7 @@ defmodule Bezalel.WorkshopDynTest do
     assert {:removal_reverted, why} = Workshop.status(back)
     assert why =~ "never reached stable"
 
-    view = AppScreen |> mount_screen() |> render_info({:tap, {:workshop, {:open_tool, id}}})
+    view = render_info(view, {:tap, {:workshop, {:open_tool, id}}})
     view = painted(view)
     assert text(view) =~ "MOST FREQUENT WORDS"
     assert text(view) =~ "Removing this tool was undone"

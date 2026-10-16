@@ -45,7 +45,9 @@ defmodule Bezalel.Workshop.Screens do
     - Of Mob: `Mob.Screen`, `Mob.Socket`, `~MOB` (`Mob.Sigil`), `Mob.UI`, `Mob.Style`, \
     `Mob.List`, `Mob.Font`, `Mob.Motion`, `Mob.Haptic`, `Mob.Clipboard`, `Mob.Alert`, \
     `Mob.Share`, `Mob.Canvas`, `Mob.Speech`. Not the theme, `Mob.State`, the device, files or \
-    web views.\
+    web views. The panel works offline: it doesn't draw `<WebView>`, `<Video>` or \
+    `<CameraPreview>`, and an `<Image>` shows only an on-phone path (no `http:`, `https:` or \
+    `data:` src).\
     """
   end
 end

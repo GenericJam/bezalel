@@ -38,12 +38,15 @@ config :rho, :dyn,
   check: [
     # Of Mob, what a study tool's screen draws with: not the theme (it's the
     # app's), the stored settings (Mob.State holds Bezalel's), the device,
-    # files, notifications, wake-ups or a web view.
+    # files, notifications, wake-ups or a web view. Nor Mob.UI's web view
+    # and camera preview nodes: a panel doesn't draw them, nor a remote
+    # image (Bezalel.Workshop.Host), and the check says so up front.
     gated: %{
       "Mob" => ~w(Mob.Screen Mob.Socket Mob.Sigil Mob.UI Mob.Style Mob.SizeClass Mob.List Mob.Font
            Mob.Motion Mob.Haptic Mob.Clipboard Mob.Alert Mob.Share Mob.Event Mob.Canvas
            Mob.Speech)
     },
+    partial: %{Mob.UI => [:webview, :camera_preview]},
     banned: %{
       Req => "reaches the network (built tools work offline)",
       ReqLLM => "calls models with the user's sign-in",

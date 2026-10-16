@@ -37,8 +37,9 @@ relates to the generations.
   `Mob.State`, device, files, notifications, wake-ups, web view); Req,
   ReqLLM, Finch, Mint, Exqlite, Ecto banned, and `:httpc`, `:gen_tcp`,
   `:gen_udp`, `:gen_sctp`, `:ssl`, `:inet`, `:socket`, `:dets`,
-  `:disk_log`. So no network, no storage, nothing of the Library, packs,
-  settings or secure store. MobBezalel (the style package) is outside the
+  `:disk_log`. So built code isn't written to reach the network, storage,
+  the Library, packs, settings or secure store, and a mistake that does is
+  refused before it runs. MobBezalel (the style package) is outside the
   Core and allowed by default, which is what screens should draw with.
 - **Screens** (`Bezalel.Workshop.Screens`): rho's mob screens with
   Bezalel's own rules for the agent. A tool's screen runs in its own
@@ -95,3 +96,14 @@ relates to the generations.
   when a tool is on probation.
 - The Dyn layer is on in host tests too; tests that build tools move the
   Keeper to a directory of their own (`test/support/dyn.ex`).
+
+## Threat model (Kevin, 2026-10-15)
+The check (rho's `Rho.Dyn.Check` plus the deny-lists above) is a
+best-effort guard against the model's mistakes: a built tool that crashes,
+hangs, calls something it shouldn't by accident, or draws a web view. It is
+not a sandbox against deliberately hostile code; rho documents the known
+ways around it. What keeps a mistake from sticking is the approval sheet,
+probation and the automatic revert. The app's copy says what is checked
+(built tools are written to read only the study library and draw on
+screen; Bezalel checks the code before it runs and puts back the old
+version if it keeps crashing), never "safe" or "no network" outright.
