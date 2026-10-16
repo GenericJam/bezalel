@@ -6,8 +6,13 @@ defmodule Bezalel.LibraryTest do
   alias Bezalel.Repo
   alias Rho.Session
 
+  # The rows go after each test too: they include agent messages with bare
+  # blocks (no "first" or "rest"), and a later screen test's mount opens the
+  # latest conversation in this shared database.
   setup do
-    for schema <- [Tool, Conversation], do: Repo.delete_all(schema)
+    clear = fn -> for schema <- [Tool, Conversation], do: Repo.delete_all(schema) end
+    clear.()
+    on_exit(clear)
     :ok
   end
 
