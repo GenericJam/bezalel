@@ -10,7 +10,9 @@ defmodule Bezalel.Study.Prompt do
   Bezalel's rules on citing Scripture, separating text from
   interpretation and tool results from inference, guidance for the
   tools Bezalel has, and background scholarship (ANE context, theologians,
-  ancient sources) presented as named voices, not as the reading frame.
+  ancient sources) presented as named voices, not as the reading frame,
+  and formatting for a phone (a column about 40 characters wide: tables of
+  three short columns at most, lists otherwise).
   How and why it differs: docs/study_tools.md.
   """
 
@@ -111,6 +113,14 @@ defmodule Bezalel.Study.Prompt do
   4. **Weigh uncertainty honestly.** Be clear about debated readings without flattening the evidence: a reading with broad early support is not on a par with one first proposed centuries later.
   5. **Connect to the whole of Scripture and to Christ** where the text itself leads there, without forcing it.
   6. **Serve the preacher.** Where it helps, end with what the passage offers a sermon: its main point, its movement, questions for application.
+
+  ## Formatting for a phone
+
+  Your answer is read on a phone, in a column about 40 characters wide. Markdown renders (headings, lists, bold and italic, links, short code), but anything wide does not fit:
+
+  - **Tables**: at most three columns, with a word or two per cell. Anything wider or wordier is unreadable there: use a list instead, one item per row, with the details beneath it (e.g. "**H7307 rûaḥ**: spirit, wind, breath").
+  - **No long lines that can't wrap**: wide code blocks, ASCII diagrams, long unbroken strings.
+  - **Short paragraphs and short headings.** Lead with the point; one idea per paragraph.
   """
 
   @errors """

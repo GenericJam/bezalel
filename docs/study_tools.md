@@ -175,6 +175,11 @@ presented as Kline's hypothesis, `get_textual_variant` as evidence before conclu
 The translation-shift point (check *nephesh*, *ruach* in their Hebrew range) stays, as a
 word-study habit.
 
+Formatting for a phone (added for Bezalel): the reader sees a column about 40
+characters wide, so tables are limited to three short columns and anything wider becomes
+a list; no unwrappable long lines. The Markdown renderer can wrap a wide table only
+badly, so the model is asked not to write one.
+
 ## Tests and fixtures
 
 `data/scripts/make_fixtures.py` cuts a small copy of each pack from `data/out` into
