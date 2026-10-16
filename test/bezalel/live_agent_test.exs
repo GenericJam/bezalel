@@ -10,7 +10,8 @@ defmodule Bezalel.LiveAgentTest do
   alias Bezalel.Library.{Conversation, Tool}
   alias Bezalel.Study.Prompt
   alias Bezalel.Test.{FakeLLM, MemoryStore}
-  alias Bezalel.Views.Helpers
+  alias Bezalel.Views.{Helpers, Study}
+  alias MobBezalel.UI
 
   @lookup {:tool_call, "c1", "lookup_verse", %{"reference" => "Exodus 31:2-3"}}
 
@@ -55,6 +56,9 @@ defmodule Bezalel.LiveAgentTest do
   defp types(blocks), do: Enum.map(blocks, & &1["type"])
   defp block(blocks, type), do: Enum.find(blocks, &(&1["type"] == type))
   defp loop?(view), do: Live.running?(assigns(view).conversation.id)
+  # The Markdown view of the block under `key` (`Helpers.block_key/2`).
+  defp markdown(view, key), do: find(view, :native_view, id: String.to_atom("md:" <> key))
+  defp texts(view), do: for(%{props: %{text: t}} <- find_all(view, :text), do: t)
 
   test "a reply streams into THINKING, a TOOL CALL with its result, the SUMMARY and the passage card, then is stored" do
     script([
@@ -100,14 +104,15 @@ defmodule Bezalel.LiveAgentTest do
     assert %{role: :agent, card: %{"title" => "Exodus 31:2-3"}} = reply
     assert reply.model == assigns(view).model_id
     assert types(reply.blocks) == ["THINKING", "TOOL CALL", "SUMMARY"]
-    # A first sentence longer than a line is cut in the header; the rest holds all of it.
+    # A first sentence longer than a line is cut in the header (plain); the
+    # rest holds all of it, as the model wrote it, in the Markdown view.
     assert block(reply.blocks, "SUMMARY")["first"] == "Bezalel is filled with the…"
-
-    assert block(reply.blocks, "SUMMARY")["rest"] ==
-             "Bezalel is filled with the Spirit. He is the first."
+    source = "Bezalel is **filled** with the Spirit. He is the first."
+    assert block(reply.blocks, "SUMMARY")["rest"] == source
 
     assert MapSet.member?(assigns(view).expanded, "#{reply.id}:sum")
-    assert text(view) =~ "He is the first."
+    assert markdown(view, "#{reply.id}:sum").props.text == source
+    refute text(view) =~ "He is the first."
 
     # A highlighted word opens its sheet; the lexicon entry comes from the pack.
     word = reply.card["words"]["H7307G"]
@@ -116,6 +121,70 @@ defmodule Bezalel.LiveAgentTest do
     view = render_async(view)
     assert {:lexeme, ^word, %{"strongs" => "H7307"}} = assigns(view).sheet
     assert_renderable(view)
+  end
+
+  test "Markdown renders natively: the summary as it streams, thinking and tool results opened; headers stay plain text" do
+    script([
+      [{:thinking, "Look up **Ex 31:3**.\n\n- the verse"}, @lookup],
+      [{:text, "## Bezalel\n\nHe is "}, {:text, "**filled**.\n\n| a | b |\n|--|--|\n| 1 | 2 |"}]
+    ])
+
+    view = AppScreen |> mount_screen() |> ask("Who is Bezalel?")
+    live = Helpers.live_id(assigns(view).conversation.id)
+    view = until(view, &match?(%{type: :message_update, delta: "## Bezalel\n\nHe is "}, &1))
+
+    # The streaming summary: a plain header, the Markdown so far in the view.
+    summary = markdown(view, live <> ":sum")
+    assert summary.props.text == "He is"
+    assert summary.props.module == MobMarkdown.View
+
+    assert Map.take(summary.props, [:text_color, :ios, :android]) ==
+             Map.take(UI.markdown_style(:summary), [:text_color, :ios, :android])
+
+    assert "Bezalel" in texts(view)
+    refute text(view) =~ "#"
+
+    # Thinking and the tool call stay folded (no view) until opened, then
+    # show their Markdown in the muted style.
+    [think, call, _sum] = Reply.blocks(stream(view))
+    assert think["first"] == "Look up Ex 31:3."
+
+    for b <- [think, call] do
+      key = "#{live}:#{b["id"]}"
+      refute markdown(view, key)
+      opened = render_info(view, {:tap, {:study, {:block, key}}})
+      body = markdown(opened, key)
+      assert body.props.text == b["rest"]
+      assert body.props.text_color == UI.markdown_style(:aside).text_color
+    end
+
+    view = until(view)
+    reply = List.last(assigns(view).messages)
+    source = "## Bezalel\n\nHe is **filled**.\n\n| a | b |\n|--|--|\n| 1 | 2 |"
+
+    assert markdown(view, "#{reply.id}:sum").props.text ==
+             "He is **filled**.\n\n| a | b |\n|--|--|\n| 1 | 2 |"
+
+    # Copy takes the Markdown as the model wrote it.
+    assert Study.copy_text(reply) =~ source
+    assert_renderable(view)
+  end
+
+  test "past the native views the screen can hold, the oldest open blocks show their Markdown as text" do
+    messages =
+      for n <- 1..205,
+          do: %{id: "m#{n}", role: :agent, blocks: [%{"id" => "sum", "rest" => "**#{n}**"}]}
+
+    expanded = MapSet.new(messages, &"#{&1.id}:sum")
+    live = {%{id: "live-1"}, [%{"id" => "sum", "rest" => "**live**"}]}
+    keys = Study.markdown_keys(messages, live, MapSet.put(expanded, "live-1:sum"))
+
+    assert MapSet.size(keys) == 200
+    assert "live-1:sum" in keys and "m205:sum" in keys and "m7:sum" in keys
+    refute "m6:sum" in keys
+
+    # Folded blocks and empty bodies take none.
+    assert Study.markdown_keys(messages, {nil, []}, MapSet.new()) == MapSet.new()
   end
 
   test "a message sent mid-reply steers it: the reply so far, the message, then the rest" do

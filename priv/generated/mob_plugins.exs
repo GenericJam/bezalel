@@ -9,7 +9,7 @@
   lifecycle: [],
   nifs: [:mob_secure_store_nif],
   notification_handlers: [],
-  plugins: [:mob_secure_store],
+  plugins: [:mob_secure_store, :mob_markdown],
   screens: [],
   settings: [],
   styles: [%{name: :mob_bezalel, theme: MobBezalel.Dark}]

@@ -19,6 +19,7 @@ Muster) applies on top.
 | **mob_bezalel** (GenericJam/mob_bezalel) | the style package: themes, palette, fonts, UI composites | GitHub, pinned (`sibling/3`) |
 | **rho** (GenericJam/rho) | agent core: loop, sessions, tools, sign-in, Dyn | GitHub, pinned until on Hex |
 | **mob_secure_store** (GenericJam/mob_secure_store) | Keychain / Keystore secrets plugin | GitHub, pinned until on Hex |
+| **mob_markdown** (GenericJam/mob_markdown) | native Markdown views (replies, tool results) | GitHub, pinned until on Hex |
 | mob, mob_dev | the framework | Hex |
 
 `BEZALEL_LOCAL_DEPS=1` uses the sibling checkouts (`../rho` etc.) instead of
@@ -292,7 +293,7 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 - rho, mob_secure_store and mob_bezalel are GitHub deps pinned to commits in
   `mix.exs` (`sibling/3`), so a fresh clone builds. To work on one alongside
   the app, run with `BEZALEL_LOCAL_DEPS=1` (uses `../rho`, `../mob_secure_store`,
-  `../mob_bezalel`), and bump the pinned commit once the change is pushed.
+  `../mob_bezalel`, `../mob_markdown`), and bump the pinned commit once the change is pushed.
 
 - `Bezalel.AppScreen` is the whole app: Study, Conversations, Workshop (and a
   built tool), Settings under one top bar and tab bar, plus the sheets and the

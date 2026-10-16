@@ -165,5 +165,10 @@ dependencies {
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
     // mob:plugin-deps BEGIN (managed — regenerated each build; do not edit)
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
+    implementation "io.noties.markwon:core:4.6.2"
+    implementation "io.noties.markwon:ext-tables:4.6.2"
+    implementation "io.noties.markwon:ext-strikethrough:4.6.2"
+    implementation "io.noties.markwon:linkify:4.6.2"
+    implementation "io.noties.markwon:html:4.6.2"
     // mob:plugin-deps END
 }
