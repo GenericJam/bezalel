@@ -14,7 +14,8 @@ config :mob_dev,
   mob_dir: Path.join(File.cwd!(), "deps/mob"),
 
   # Path to your Elixir lib dir (e.g. ~/.local/share/mise/installs/elixir/1.18.4-otp-28/lib).
-  elixir_lib: System.get_env("MOB_ELIXIR_LIB", :code.lib_dir(:elixir) |> to_string() |> Path.dirname()),
+  elixir_lib:
+    System.get_env("MOB_ELIXIR_LIB", :code.lib_dir(:elixir) |> to_string() |> Path.dirname()),
 
   # iOS devices and orientations, stamped into the built app's Info.plist
   # (they override ios/Info.plist). ios_target_devices: [:iphone, :ipad] runs
@@ -44,12 +45,13 @@ config :mob_dev,
 # its native code, permissions, and any demo screens at build time. Drop a name
 # here to deactivate a plugin without removing the dep; remove both to drop it
 # entirely (the native build shrinks and a clean rebuild prunes its artifacts).
-config :mob, :plugins, [:mob_secure_store]
+config :mob, :plugins, [:mob_secure_store, :mob_markdown]
 
 # mob_secure_store (the Keychain / Keystore rho keeps sign-ins and API keys
-# in) isn't released, so its checkout is unsigned: build it anyway. Once it's
-# on Hex, drop this and add it to :trusted_plugins below.
-config :mob, :acknowledge_unsafe_plugins, [:mob_secure_store]
+# in) and mob_markdown (the native Markdown view replies render in) aren't
+# released, so their checkouts are unsigned: build them anyway. Once they're
+# on Hex, drop this and add them to :trusted_plugins below.
+config :mob, :acknowledge_unsafe_plugins, [:mob_secure_store, :mob_markdown]
 
 # Style packages: the app's look. mob_bezalel is the Bezalel design plugin
 # (themes, palette, fonts); boot applies its default, MobBezalel.Dark.
@@ -77,7 +79,5 @@ config :mob, :trusted_plugins, %{
   mob_mishka: "ed25519:nc56w+1Kx0gIt/4EkHxnMZCKHMzp4+S5kS/HoSzEZkg=",
   mob_ash: "ed25519:nc56w+1Kx0gIt/4EkHxnMZCKHMzp4+S5kS/HoSzEZkg="
 }
-
-
 
 if File.exists?(Path.join(__DIR__, "mob.local.exs")), do: import_config("mob.local.exs")

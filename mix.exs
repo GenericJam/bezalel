@@ -32,7 +32,14 @@ defmodule Bezalel.MixProject do
       # release builds (MOB-476, MOB-480).
       {:mob_dev, "~> 0.7.29", only: :dev, runtime: false},
       # The design plugin (style package): Bezalel's themes, palette, fonts.
-      sibling(:mob_bezalel, "GenericJam/mob_bezalel", "9dbf917e9f86ee81d997b85f225ef2209c741c17"),
+      sibling(:mob_bezalel, "GenericJam/mob_bezalel", "1f2d2df505a08dd535f9c63e49d34150cf231ee1"),
+      # Native Markdown views (Markwon / Foundation) for replies and tool
+      # results. Unreleased: pinned to a commit.
+      sibling(
+        :mob_markdown,
+        "GenericJam/mob_markdown",
+        "075ef619fc50e18e8482400c6f13304f93264f4e"
+      ),
       {:ecto_sqlite3, "~> 0.18"},
       # The study packs are read with Exqlite directly (Bezalel.Study.DB).
       {:exqlite, "~> 0.42"},
@@ -85,7 +92,7 @@ defmodule Bezalel.MixProject do
 
   # A dependency developed alongside Bezalel: GitHub, pinned to a commit, so
   # a fresh clone builds. BEZALEL_LOCAL_DEPS=1 uses the sibling checkouts
-  # (../rho, ../mob_secure_store, ../mob_bezalel) instead, for working on them.
+  # (../rho, ../mob_secure_store, ../mob_bezalel, ../mob_markdown) instead, for working on them.
   defp sibling(app, repo, ref) do
     if System.get_env("BEZALEL_LOCAL_DEPS") in ["1", "true"],
       do: {app, path: "../#{app}", override: true},

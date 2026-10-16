@@ -46,6 +46,17 @@ defmodule Bezalel.Study.Patterns do
     word_edges: {~S"^[\p{P}\p{S}]+|[\p{P}\p{S}]+$", "u"},
     # Bezalel.Agent.Reply: a block's header, its first sentence or line.
     first_sentence: {~S"\A.+?(?:[.?!:](?=\s)|\n|\z)", "su"},
+    # Bezalel.Agent.Reply: a Markdown line that is a block of its own (a
+    # heading, a list item, a quote, a table row, a fence) ...
+    md_block_line: {~S"^ {0,3}(?:#{1,6}(?:\s|$)|[-*+]\s|[0-9]{1,9}[.)]\s|>|\||```|~~~)", "u"},
+    # ... the marks that open it (nested: "> - [ ] item") ...
+    md_block_mark:
+      {~S"^(?:\s*(?:#{1,6}(?:\s+|$)|[-*+]\s+(?:\[[ xX]\]\s+)?|[0-9]{1,9}[.)]\s+|>\s?))+", "u"},
+    # ... and a link or image, its text kept.
+    md_link: {~S"!?\[([^\]]*)\]\([^)]*\)", "u"},
+    # ... and an underscore that can open or close emphasis (not one inside
+    # a word, as in lookup_verse).
+    md_underscore: {~S"(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])", "u"},
     # Ancient sources (database.py, tools.py, server.py, corpora/*.py).
     # parse_passage_reference's _PASSAGE_RE, for parse_biblical_range.
     biblical_range:

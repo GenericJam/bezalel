@@ -36,6 +36,15 @@ defmodule Bezalel.Views.Study do
     model = Models.get(assigns.model_id)
     live? = Agent.live?(assigns.account)
     stream = Map.get(assigns.streams, assigns.conversation.id)
+    live_blocks = if stream, do: Reply.blocks(stream), else: []
+
+    assigns =
+      Map.put(
+        assigns,
+        :markdown,
+        markdown_keys(assigns.messages, {live_message(stream), live_blocks}, assigns.expanded)
+      )
+
     rows = Enum.map(assigns.messages, &message(&1, assigns))
     draft_change = {self(), :draft}
     send_tap = {self(), {:study, :send}}
@@ -73,7 +82,7 @@ defmodule Bezalel.Views.Study do
             text_color={:muted}
           />
           {rows}
-          {live(stream, assigns)}
+          {live(stream, live_blocks, assigns)}
           <Text
             :if={Helpers.replying?(assigns)}
             text={replying_label(stream)}
@@ -158,7 +167,7 @@ defmodule Bezalel.Views.Study do
   end
 
   defp message(%{role: :agent} = m, assigns) do
-    blocks = Enum.map(m.blocks, &block(m, &1, assigns.expanded))
+    blocks = Enum.map(m.blocks, &block(m, &1, assigns))
 
     ~MOB"""
     <Column gap={8} fill_width={true}>
@@ -174,11 +183,11 @@ defmodule Bezalel.Views.Study do
 
   # The reply streaming in (or failed): its blocks, card and pictures so
   # far, the messages waiting to steer it, and its error.
-  defp live(nil, _assigns), do: []
+  defp live(nil, _blocks, _assigns), do: []
 
-  defp live(r, assigns) do
-    pseudo = %{id: live_id(r.conversation_id)}
-    blocks = Enum.map(Reply.blocks(r), &block(pseudo, &1, assigns.expanded))
+  defp live(r, blocks, assigns) do
+    pseudo = live_message(r)
+    blocks = Enum.map(blocks, &block(pseudo, &1, assigns))
     pending = Enum.map(r.pending, &queued/1)
 
     ~MOB"""
@@ -238,19 +247,47 @@ defmodule Bezalel.Views.Study do
 
   defp failure(_reply), do: []
 
-  defp block(message, b, expanded) do
+  defp block(message, b, assigns) do
     key = Helpers.block_key(message, b)
     kind = if b["id"] == "sum", do: :summary, else: :aside
+    open? = MapSet.member?(assigns.expanded, key)
 
-    UI.block(
-      b["type"],
-      b["first"],
-      b["rest"],
-      MapSet.member?(expanded, key),
-      {self(), {:study, {:block, key}}},
-      kind
-    )
+    rest =
+      if MapSet.member?(assigns.markdown, key),
+        do: markdown(key, b["rest"], kind),
+        else: b["rest"]
+
+    UI.block(b["type"], b["first"], rest, open?, {self(), {:study, {:block, key}}}, kind)
   end
+
+  # A block's body is Markdown (the model's, a tool's) in a native view
+  # (mob_markdown), its id from the block's key: one atom per block shown.
+  defp markdown(key, text, kind),
+    do: MobMarkdown.view(String.to_atom("md:" <> key), text, UI.markdown_style(kind))
+
+  # The open blocks with a body, newest first, up to the native views the
+  # screen can hold: mob has 256 native component slots, and a view past
+  # them renders nothing. A frame's new views take their slots before the
+  # last frame's leave theirs (mob expands the tree, then reconciles), so
+  # two frames' worth must fit: Expand all in a long study swaps most of
+  # them at once. Older ones show their Markdown as text.
+  @markdown_views 120
+
+  @doc false
+  def markdown_keys(messages, {live, live_blocks}, expanded) do
+    stored = for %{role: :agent} = m <- messages, b <- m.blocks, do: {m, b}
+
+    (stored ++ Enum.map(live_blocks, &{live, &1}))
+    |> Enum.reverse()
+    |> Enum.map(fn {m, b} -> {Helpers.block_key(m, b), b["rest"]} end)
+    |> Enum.filter(fn {key, rest} -> rest not in [nil, ""] and MapSet.member?(expanded, key) end)
+    |> Enum.take(@markdown_views)
+    |> MapSet.new(&elem(&1, 0))
+  end
+
+  # The streaming reply's blocks are keyed under this stand-in message.
+  defp live_message(nil), do: nil
+  defp live_message(r), do: %{id: Helpers.live_id(r.conversation_id)}
 
   defp passage(nil), do: []
 
@@ -1022,9 +1059,10 @@ defmodule Bezalel.Views.Study do
     end
   end
 
-  defp copy_text(%{role: :user, text: text}), do: text
+  @doc false
+  def copy_text(%{role: :user, text: text}), do: text
 
-  defp copy_text(%{blocks: blocks, passage: passage, card: card, image: image}) do
+  def copy_text(%{blocks: blocks, passage: passage, card: card, image: image}) do
     summary = for b <- blocks, b["id"] == "sum", do: summary_text(b)
 
     cited =
@@ -1038,7 +1076,9 @@ defmodule Bezalel.Views.Study do
     Enum.join(summary ++ cited ++ drawing, "\n\n")
   end
 
-  # A cut header repeats the whole text under it.
+  # The model's Markdown as it wrote it; a scripted reply's header and
+  # rest (a cut header repeats the whole text under it).
+  defp summary_text(%{"text" => text}), do: text
   defp summary_text(%{"cut" => true, "rest" => rest}), do: rest
   defp summary_text(%{"first" => first, "rest" => rest}), do: String.trim(first <> " " <> rest)
 

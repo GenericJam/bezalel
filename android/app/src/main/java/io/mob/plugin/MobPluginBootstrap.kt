@@ -13,6 +13,7 @@ object MobPluginBootstrap {
 
     @JvmStatic
     fun registerAll(activity: Activity) {
+        registerUiComponents()
         io.mob.securestore.MobSecureStoreBridge.register()
         handOff(io.mob.securestore.MobSecureStoreBridge, activity)
         collectPermissionProvider(io.mob.securestore.MobSecureStoreBridge)
@@ -41,6 +42,14 @@ object MobPluginBootstrap {
     private fun collectPermissionProvider(bridge: Any) {
         (bridge as? MobPermissionProvider)?.let {
             if (!permissionProviders.contains(it)) permissionProviders.add(it)
+        }
+    }
+
+    // Registers explicitly opted-in plugin ui_components factories.
+    private fun registerUiComponents() {
+        // mob_markdown: MobMarkdown_View
+        com.example.bezalel.MobNativeViewRegistry.register("MobMarkdown_View") { props, send ->
+            io.mob.markdown.MobMarkdownView(props, send)
         }
     }
 }

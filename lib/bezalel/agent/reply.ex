@@ -202,43 +202,54 @@ defmodule Bezalel.Agent.Reply do
   `"cut" => true` when `first` is a cut-short header and `rest` the whole
   text): each call's THINKING and TOOL CALLs in order, then the SUMMARY
   (with the text still streaming).
+
+  `first` is a plain line (`header/1`); `rest` is Markdown, the model's or
+  the tool's own, which the chat renders. THINKING and SUMMARY carry the
+  model's whole text as `"text"` (what Copy copies).
   """
   @spec blocks(t()) :: [map()]
   def blocks(r) do
     items =
       for item <- r.items, block = item_block(item), do: block
 
-    case plain(join(r.summary, r.text)) do
+    case String.trim(join(r.summary, r.text)) do
       "" -> items
       summary -> items ++ [block("sum", "SUMMARY", summary)]
     end
   end
 
   @doc """
-  Model text as the blocks show it: Markdown's emphasis and code marks
-  dropped, headings as plain lines, list items as bullets.
+  One line of Markdown as plain text, for a block's header: heading, list
+  and quote marks dropped, a table row's cells joined by " · ", emphasis,
+  code and strikethrough marks dropped, links and images as their text.
   """
-  @spec plain(String.t()) :: String.t()
-  def plain(text) do
-    text
-    |> String.split("\n")
-    |> Enum.map_join("\n", &plain_line/1)
-    |> String.replace(["**", "__", "`", "*"], "")
+  @spec header(String.t()) :: String.t()
+  def header(line) do
+    line
     |> String.trim()
+    |> strip_block_marks()
+    |> then(&Regex.replace(Patterns.get(:md_link), &1, "\\1"))
+    |> String.replace(["**", "__", "~~", "`", "*"], "")
+    |> then(&Regex.replace(Patterns.get(:md_underscore), &1, ""))
+    |> String.split()
+    |> Enum.join(" ")
   end
 
-  defp plain_line(line) do
-    trimmed = String.trim_leading(line)
-
+  defp strip_block_marks(line) do
     cond do
-      String.starts_with?(trimmed, "#") -> String.trim_leading(trimmed, "#") |> String.trim()
-      String.starts_with?(trimmed, ["* ", "- "]) -> "• " <> String.slice(trimmed, 2..-1//1)
-      true -> line
+      String.starts_with?(line, "|") ->
+        line |> String.trim("|") |> String.split("|") |> Enum.map_join(" · ", &String.trim/1)
+
+      String.starts_with?(line, ["```", "~~~"]) ->
+        ""
+
+      true ->
+        Regex.replace(Patterns.get(:md_block_mark), line, "")
     end
   end
 
   defp item_block(%{kind: :think, id: id, text: text}) do
-    case plain(text) do
+    case String.trim(text) do
       "" -> nil
       text -> block(id, "THINKING", text)
     end
@@ -251,31 +262,59 @@ defmodule Bezalel.Agent.Reply do
   # `"cut"` marks a header cut short: `rest` then holds the whole text.
   defp block(id, type, text) do
     {first, rest, cut?} = split(text)
-    b = %{"id" => id, "type" => type, "first" => first, "rest" => rest}
+    b = %{"id" => id, "type" => type, "first" => first, "rest" => rest, "text" => text}
     if cut?, do: Map.put(b, "cut", true), else: b
   end
 
-  # The header line: the first sentence (or line); a long one is cut and
-  # the whole text goes under it.
+  # The header: the first line when it's a block of its own (a heading, a
+  # list item, a quote), else the first sentence; the rest is what follows
+  # it. A table or a code block first stays whole under its first line, as
+  # does a text whose header would be long, or empty, or would leave the
+  # rest's Markdown unbalanced (a link or emphasis running on past it).
   defp split(text) do
-    sentence =
-      case Regex.run(Patterns.get(:first_sentence), text) do
-        [match] -> String.trim(match)
-        nil -> text
+    [line | _] = String.split(text, "\n", parts: 2)
+
+    head =
+      cond do
+        Regex.match?(Patterns.get(:md_block_line), line) -> line
+        match = Regex.run(Patterns.get(:first_sentence), text) -> hd(match)
+        true -> text
       end
 
-    if String.length(sentence) > @first_max,
-      do: {cut(sentence), text, true},
-      else:
-        {sentence, text |> String.slice(String.length(sentence)..-1//1) |> String.trim(), false}
+    first = header(head)
+    whole? = String.starts_with?(String.trim_leading(line), ["|", "```", "~~~"])
+
+    if whole? or first == "" or String.length(first) > @first_max or
+         not balanced?(strip_block_marks(String.trim(head))),
+       do: {cut(text), text, true},
+       else: {first, text |> String.slice(String.length(head)..-1//1) |> String.trim(), false}
   end
 
-  defp cut(text) do
-    head = String.slice(text, 0, @first_max)
+  defp balanced?(markdown) do
+    count = &(length(String.split(markdown, &1)) - 1)
+    singles = markdown |> String.replace("**", "") |> String.split("*") |> length()
 
-    case String.split(head, " ") do
-      [_one] -> head <> "…"
-      words -> (words |> Enum.drop(-1) |> Enum.join(" ")) <> "…"
+    underscores =
+      length(Regex.scan(Patterns.get(:md_underscore), String.replace(markdown, "__", "")))
+
+    count.("[") == count.("]") and count.("(") == count.(")") and
+      Enum.all?(["`", "~~", "**", "__"], &(rem(count.(&1), 2) == 0)) and rem(singles - 1, 2) == 0 and
+      rem(underscores, 2) == 0
+  end
+
+  # The first line with words in it, plain, cut to about a line.
+  defp cut(text) do
+    line = text |> String.split("\n") |> Enum.map(&header/1) |> Enum.find("", &(&1 != ""))
+
+    if String.length(line) <= @first_max do
+      line
+    else
+      head = String.slice(line, 0, @first_max)
+
+      case String.split(head, " ") do
+        [_one] -> head <> "…"
+        words -> (words |> Enum.drop(-1) |> Enum.join(" ")) <> "…"
+      end
     end
   end
 
@@ -295,18 +334,44 @@ defmodule Bezalel.Agent.Reply do
   # A passage reads better as its verses than as the Markdown the model got.
   defp result(%{card: %{} = card}), do: "→ " <> Card.text(card)
 
+  # The tool's Markdown as it is, its first lines: whole lines, so a table
+  # row or a heading isn't cut through (a cut fence runs to the end, as
+  # Markdown has it). The "…" is a paragraph of its own, or it would join a
+  # table as a row.
   defp result(%{result: text, error: error}) do
-    lines =
-      text
-      |> plain()
-      |> String.split("\n", trim: true)
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
+    lines = text |> String.trim() |> String.split("\n")
+    {shown, more?} = first_lines(lines)
+    shown = if more?, do: shown <> "\n\n…", else: shown
+    if error, do: "Error: " <> shown, else: shown
+  end
 
-    shown = lines |> Enum.take(@result_lines) |> Enum.join("\n")
-    more? = length(lines) > @result_lines or String.length(shown) > @result_chars
-    shown = String.slice(shown, 0, @result_chars) <> if(more?, do: "…", else: "")
-    if error, do: "Error: " <> shown, else: "→ " <> shown
+  defp first_lines(lines) do
+    {kept, _count, _chars} =
+      Enum.reduce_while(lines, {[], 0, 0}, fn line, {kept, count, chars} ->
+        count = if String.trim(line) == "", do: count, else: count + 1
+        chars = chars + String.length(line) + 1
+
+        if count > @result_lines or (kept != [] and chars > @result_chars),
+          do: {:halt, {kept, count, chars}},
+          else: {:cont, {[line | kept], count, chars}}
+      end)
+
+    shown = kept |> Enum.reverse() |> Enum.join("\n") |> String.trim_trailing()
+
+    # A first line longer than the limit on its own (JSON, minified HTML) is
+    # cut at a word.
+    if String.length(shown) > @result_chars,
+      do: {clip(shown), true},
+      else: {shown, length(kept) < length(lines)}
+  end
+
+  defp clip(text) do
+    head = String.slice(text, 0, @result_chars)
+
+    case String.split(head, " ") do
+      [_one] -> head
+      words -> words |> Enum.drop(-1) |> Enum.join(" ")
+    end
   end
 
   # A passage from lookup_verse wins over word_study's examples; the
