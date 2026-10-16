@@ -43,9 +43,8 @@ defmodule Bezalel.MixProject do
       {:ecto_sqlite3, "~> 0.18"},
       # The study packs are read with Exqlite directly (Bezalel.Study.DB).
       {:exqlite, "~> 0.42"},
-      # The agent core: models, sign-in, usage, Dyn. Pinned to a commit until
-      # rho is on Hex.
-      sibling(:rho, "GenericJam/rho", "db5f915b08043a8ef288156437733c734f6e145c"),
+      # The agent core: models, sign-in, usage, Dyn.
+      sibling(:rho, "~> 0.1"),
       # The platform secure store (Keychain / Keystore) rho keeps the
       # sign-ins and API keys in. Unreleased: pinned to a commit.
       sibling(
@@ -90,12 +89,20 @@ defmodule Bezalel.MixProject do
     ]
   end
 
-  # A dependency developed alongside Bezalel: GitHub, pinned to a commit, so
-  # a fresh clone builds. BEZALEL_LOCAL_DEPS=1 uses the sibling checkouts
-  # (../rho, ../mob_secure_store, ../mob_bezalel, ../mob_markdown) instead, for working on them.
+  # A dependency developed alongside Bezalel. Unreleased ones come from
+  # GitHub, pinned to a commit, so a fresh clone builds; released ones from
+  # Hex. BEZALEL_LOCAL_DEPS=1 uses the sibling checkouts (../rho,
+  # ../mob_secure_store, ../mob_bezalel, ../mob_markdown) instead, for
+  # working on them.
+  defp sibling(app, requirement) do
+    if local_deps?(), do: {app, path: "../#{app}", override: true}, else: {app, requirement}
+  end
+
   defp sibling(app, repo, ref) do
-    if System.get_env("BEZALEL_LOCAL_DEPS") in ["1", "true"],
+    if local_deps?(),
       do: {app, path: "../#{app}", override: true},
       else: {app, github: repo, ref: ref}
   end
+
+  defp local_deps?, do: System.get_env("BEZALEL_LOCAL_DEPS") in ["1", "true"]
 end

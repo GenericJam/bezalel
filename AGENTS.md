@@ -17,13 +17,14 @@ Muster) applies on top.
 |---|---|---|
 | **bezalel** (this, GitHub GenericJam/bezalel, public) | the app; `data/` builds the study packs | — |
 | **mob_bezalel** (GenericJam/mob_bezalel) | the style package: themes, palette, fonts, UI composites | GitHub, pinned (`sibling/3`) |
-| **rho** (GenericJam/rho) | agent core: loop, sessions, tools, sign-in, Dyn | GitHub, pinned until on Hex |
+| **rho** (GenericJam/rho) | agent core: loop, sessions, tools, sign-in, Dyn | Hex (`~> 0.1`, `sibling/2`) |
 | **mob_secure_store** (GenericJam/mob_secure_store) | Keychain / Keystore secrets plugin | GitHub, pinned until on Hex |
 | **mob_markdown** (GenericJam/mob_markdown) | native Markdown views (replies, tool results) | GitHub, pinned until on Hex |
 | mob, mob_dev | the framework | Hex |
 
 `BEZALEL_LOCAL_DEPS=1` uses the sibling checkouts (`../rho` etc.) instead of
-the pins; push the sibling, then bump the SHA. Study data is published to R2
+the pins and Hex; push the sibling, then bump the SHA (or, for rho, release
+it and bump the requirement). Study data is published to R2
 at https://bezalel.genericjam.com/packs/manifest.json (`data/README.md`).
 
 ## Issue tracking
@@ -297,10 +298,13 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 
 ## The app
 
-- rho, mob_secure_store, mob_bezalel and mob_markdown are GitHub deps pinned to commits in
-  `mix.exs` (`sibling/3`), so a fresh clone builds. To work on one alongside
-  the app, run with `BEZALEL_LOCAL_DEPS=1` (uses `../rho`, `../mob_secure_store`,
-  `../mob_bezalel`, `../mob_markdown`), and bump the pinned commit once the change is pushed.
+- mob_secure_store, mob_bezalel and mob_markdown are GitHub deps pinned to
+  commits in `mix.exs` (`sibling/3`), so a fresh clone builds; rho comes from
+  Hex (`sibling/2`). To work on one alongside the app, run with
+  `BEZALEL_LOCAL_DEPS=1` (uses `../rho`, `../mob_secure_store`,
+  `../mob_bezalel`, `../mob_markdown`); once the change is pushed, bump the
+  pinned commit, or for rho release it (its release workflow publishes on a
+  `@version` bump, with Kevin's OK) and bump the requirement if needed.
 
 - `Bezalel.AppScreen` is the whole app: Study, Conversations, Workshop (and a
   built tool), Settings under one top bar and tab bar, plus the sheets and the
@@ -331,7 +335,7 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   system prompt (`Bezalel.Study.Prompt`); the live agent runs them. How
   they were ported, the pack access, the fixtures and the differences from
   studybible-mcp: `docs/study_tools.md`.
-- **rho** (GenericJam/rho, pinned to a commit until it's on Hex) is the agent core:
+- **rho** (GenericJam/rho, on Hex, https://hexdocs.pm/rho) is the agent core:
   `Rho.Supervisor` starts in `Bezalel.App.on_start`, configured in
   `config/config.exs` (`config :rho`: data dir from `Mob.data_dir/0`, the
   secure store, `Mob.Device.open_url/1`, app name and hints). Read rho's
