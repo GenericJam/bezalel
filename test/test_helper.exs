@@ -41,7 +41,14 @@ redirect = fn provider ->
   "http://localhost:0" <> path
 end
 
-{:ok, _} = Rho.Supervisor.start_link(tools: [], login: [redirect: redirect])
+# As the app starts it (Bezalel.App): the study tools in the registry, and
+# the Dyn layer (config :rho, :dyn) on the temp data dir's dyn/, at
+# generation 0. Tests that build tools move it to a dir of their own
+# (Bezalel.Test.Dyn).
+{:ok, _} =
+  Rho.Supervisor.start_link(tools: Bezalel.Agent.Live.tools(), login: [redirect: redirect])
+
+%{generation: 0, mode: :normal} = Rho.Dyn.boot()
 {:ok, _} = Bezalel.Agent.Live.start_link()
 
 ExUnit.start()

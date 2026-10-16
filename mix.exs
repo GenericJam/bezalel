@@ -36,9 +36,9 @@ defmodule Bezalel.MixProject do
       {:ecto_sqlite3, "~> 0.18"},
       # The study packs are read with Exqlite directly (Bezalel.Study.DB).
       {:exqlite, "~> 0.42"},
-      # The agent core: models, sign-in, usage. Pinned to a commit until rho
-      # is on Hex.
-      sibling(:rho, "GenericJam/rho", "c8550e9486852e5c259ee515d5b505dc1cd0d5c1"),
+      # The agent core: models, sign-in, usage, Dyn. Pinned to a commit until
+      # rho is on Hex.
+      sibling(:rho, "GenericJam/rho", "6b10cc67a4e4cae2b28950b546cb1592a9fc7a64"),
       # The platform secure store (Keychain / Keystore) rho keeps the
       # sign-ins and API keys in. Unreleased: pinned to a commit.
       sibling(

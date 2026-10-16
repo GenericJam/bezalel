@@ -401,6 +401,17 @@ defmodule Bezalel.Library do
   @spec create_tool(map()) :: {:ok, Tool.t()} | {:error, Ecto.Changeset.t()}
   def create_tool(attrs), do: %Tool{} |> Tool.changeset(attrs) |> Repo.insert()
 
+  @doc "Changes a built tool (a Workshop change to its code)."
+  @spec update_tool(Tool.t(), map()) :: {:ok, Tool.t()} | {:error, Ecto.Changeset.t()}
+  def update_tool(tool, attrs), do: tool |> Tool.changeset(attrs) |> Repo.update()
+
+  @doc "Forgets a built tool (its code, for a Workshop tool, goes with a Dyn generation)."
+  @spec delete_tool(Tool.t()) :: :ok
+  def delete_tool(tool) do
+    Repo.delete_all(from(t in Tool, where: t.id == ^tool.id))
+    :ok
+  end
+
   @doc "How many tools are stored."
   @spec tool_count() :: non_neg_integer()
   def tool_count, do: Repo.aggregate(Tool, :count)

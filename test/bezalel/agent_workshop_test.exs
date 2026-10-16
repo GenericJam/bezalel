@@ -5,6 +5,7 @@ defmodule Bezalel.AgentWorkshopTest do
   alias Bezalel.Library
   alias Bezalel.Library.{Conversation, Message, Tool}
   alias Bezalel.{Repo, Workshop}
+  alias Bezalel.Test.MemoryStore
 
   setup do
     for schema <- [Tool, Conversation], do: Repo.delete_all(schema)
@@ -50,11 +51,11 @@ defmodule Bezalel.AgentWorkshopTest do
     me = self()
 
     assert {:ok, tool} =
-             Workshop.build(
-               "A sermon outline helper for Exodus 31",
-               c.id,
-               "haiku",
-               &send(me, {:step, &1})
+             Workshop.build("A sermon outline helper for Exodus 31",
+               mode: :sample,
+               conversation_id: c.id,
+               model_id: "haiku",
+               on_step: &send(me, {:step, &1})
              )
 
     assert %{
@@ -69,13 +70,16 @@ defmodule Bezalel.AgentWorkshopTest do
     assert [%{"num" => "I"}, %{"num" => "II"}, %{"num" => "III"}] = tool.data["moves"]
     assert [tool.id] == Enum.map(Library.list_tools(), & &1.id)
 
-    steps = for _ <- Workshop.steps(), do: assert_received({:step, _})
+    steps = for _ <- Workshop.steps(false), do: assert_received({:step, _})
     assert steps |> Enum.map(fn {:step, i} -> i end) |> Enum.uniq() == [0, 1, 2, 3]
   end
 
   test "without a model, any description builds the design's sample" do
+    MemoryStore.clear()
+    assert Workshop.mode(Bezalel.Account.status()) == :sample
+
     assert {:ok, tool} =
-             Workshop.build("Reading plan: Lent, 40 days", nil, "sonnet", fn _ -> :ok end)
+             Workshop.build("Reading plan: Lent, 40 days", mode: :sample, model_id: "sonnet")
 
     assert %{name: "Sermon Outline", description: "Reading plan: Lent, 40 days"} = tool
     assert tool.data["text"] == "Exodus 31:1–11"

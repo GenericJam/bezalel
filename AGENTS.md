@@ -349,8 +349,29 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   Try again (and Open Settings for sign-in problems). Without a credential,
   replies are the design's storyboard (`Bezalel.Agent.Storyboard`), and
   Settings and Study say so. Tests drive Live with a scripted model
-  (`test/support/fake_llm.ex`, `test/bezalel/live_agent_test.exs`). The
-  Workshop builder (`Bezalel.Workshop`) is still the storyboard.
+  (`test/support/fake_llm.ex`, `test/bezalel/live_agent_test.exs`). Study's
+  loop takes rho's registry (the study tools, plus the tools built in the
+  Workshop) and withholds the `dyn_*` tools.
+- **The Workshop** (`Bezalel.Workshop`, decisions/2026-10-15-workshop-on-dyn.md)
+  builds tools through rho's Dyn layer (`config :rho, :dyn`): with a model,
+  a rho loop (`Bezalel.Workshop.Builder`, prompt `Bezalel.Workshop.Prompt`)
+  writes `Bezalel.Dyn.<Name>` (a `Rho.Tool`) and `Bezalel.Dyn.<Name>.Screen`
+  and proposes a generation; the Workshop shows what it adds, the approval
+  sheet activates it (`Rho.Dyn.Approval.Biometric` fed by the tap), it runs
+  on probation (three crashes in a minute revert it; the Workshop says so).
+  Built code may call only `Bezalel.Workshop.Study` of Bezalel (read-only
+  study data) and Mob's/MobBezalel's drawing modules: no network, no
+  storage. A tool's screen runs in its own process in the panel
+  (`Bezalel.Workshop.Host`). Without a model it's still the storyboard
+  sample. Generations live in `dyn/` under rho's data dir. Tests:
+  `test/bezalel/workshop_dyn_test.exs`; tests that build tools move the
+  Keeper to their own dir (`test/support/dyn.ex`). On a device, let the
+  app run ten seconds after its first frame before restarting or
+  redeploying while a tool is on probation: a quicker restart counts as a
+  failed launch (the generation is reverted at the next boot; two in a row
+  start without built tools). Driving a build on a device without an
+  account: the stand-in below, scripted to answer the Workshop's prompt
+  with `dyn_write` and `dyn_propose` calls.
 - **The study library** (`Bezalel.Packs`, `Bezalel.Views.StudyLibrary`):
   the packs are downloaded from
   https://bezalel.genericjam.com/packs/manifest.json (`data/README.md`,

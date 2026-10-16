@@ -1,6 +1,7 @@
 # Plan: a real agent for Bezalel
 
-Status: agreed 2026-10-14; tracked in beads (`bd list`). Nothing here is started.
+Status: agreed 2026-10-14; tracked in beads (`bd list`). Phase 6 (the
+Workshop on Dyn) landed 2026-10-15: decisions/2026-10-15-workshop-on-dyn.md.
 
 ## Decisions taken
 

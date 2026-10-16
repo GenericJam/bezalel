@@ -6,6 +6,8 @@ defmodule Bezalel.App do
   alias Bezalel.Agent.Live
   alias Bezalel.Packs.Storage
 
+  require Logger
+
   @impl Mob.App
   def navigation(_platform) do
     stack(:main, root: Bezalel.AppScreen)
@@ -34,12 +36,18 @@ defmodule Bezalel.App do
 
     :ok = Bezalel.Certs.install!()
 
-    # rho (models, sign-in, usage, the agent loop). Mob doesn't start a
-    # dep's Applications on device, so the HTTP stack is started first. The
-    # loops carry their own tools (Bezalel.Agent.Live), so the registry's
-    # list stays empty; Live names its loops in its own Registry.
+    # rho (models, sign-in, usage, the agent loop, the Dyn layer). Mob
+    # doesn't start a dep's Applications on device, so the HTTP stack is
+    # started first. The registry holds the study tools; with Dyn on
+    # (config :rho, :dyn) it adds the dyn_* tools the Workshop builds with
+    # and the tools the user built (Bezalel.Workshop). Dyn's boot loads the
+    # current generation (or reverts one whose launch died) before the
+    # first screen, whose first frame starts its clock to "stable". Live
+    # names its loops in its own Registry.
     {:ok, _} = Application.ensure_all_started(:req_llm)
-    {:ok, _} = Rho.Supervisor.start_link(tools: [])
+    {:ok, _} = Rho.Supervisor.start_link(tools: Live.tools())
+    boot = Rho.Dyn.boot()
+    Logger.info("[dyn] boot: #{inspect(boot)}")
     {:ok, _} = Live.start_link()
     # The study library: fetches the pack list on first launch, resumes a
     # download the app was stopped in, and runs downloads outside the screen.

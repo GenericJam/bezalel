@@ -40,6 +40,9 @@ defmodule Bezalel.AppScreen do
     # The study library (Settings, the first-launch offer) follows the
     # downloads, which run outside this screen.
     :ok = Bezalel.Packs.subscribe()
+    # Built tools' activations, crashes and reverts (the Workshop shows
+    # them; a revert also says so wherever the user is).
+    :ok = Rho.Dyn.subscribe()
 
     conversation = Library.get_conversation(Settings.conversation_id()) || Library.seed!()
 
@@ -72,7 +75,13 @@ defmodule Bezalel.AppScreen do
         images: %{},
         viewer: nil,
         switched: false,
-        move_open: 0
+        move_open: 0,
+        tool_host: nil,
+        tool_view: nil,
+        tool_state: nil,
+        tool_status: %{},
+        change_of: nil,
+        code_open: false
       )
       |> Helpers.open_conversation(conversation)
       |> StudyLibrary.mount()
@@ -233,6 +242,14 @@ defmodule Bezalel.AppScreen do
     do: {:noreply, SettingsView.login_result(provider, result, socket)}
 
   def handle_info({:build_step, i}, socket), do: {:noreply, Workshop.step(i, socket)}
+
+  def handle_info({Bezalel.Workshop.Host, pid, {:view, tree}}, socket),
+    do: {:noreply, Workshop.host_view(pid, tree, socket)}
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket),
+    do: {:noreply, Workshop.host_down(ref, reason, socket)}
+
+  def handle_info({:rho_dyn, event}, socket), do: {:noreply, Workshop.dyn_event(event, socket)}
 
   def handle_info({:toast_expire, ref}, socket) do
     case socket.assigns.toast do

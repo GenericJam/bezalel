@@ -1,9 +1,14 @@
 defmodule Bezalel.Agent.Live do
   @moduledoc """
   The live study agent: rho's loop (`Rho.Loop`) with the study system
-  prompt (`Bezalel.Study.Prompt`) and the study tools
+  prompt (`Bezalel.Study.Prompt`), the study tools
   (`Bezalel.Study.Tools.all/0`, plus rho's `read_artifact` for a result
-  too long to send whole), on the model chosen in Settings.
+  too long to send whole) and the tools the user built in the Workshop
+  (the current Dyn generation's, `Rho.Dyn.Source`, from the next model
+  call after one is approved or reverted), on the model chosen in Settings.
+  The loop takes its tools from rho's registry, which the app starts with
+  `tools/0` (the Dyn layer adds its `dyn_*` tools there, for the
+  Workshop; Study withholds them, `withheld/0`).
 
   **The conversation's session is the loop's.** A conversation's
   transcript is its rho session (`Bezalel.Library`); a loop resumes it
@@ -34,6 +39,7 @@ defmodule Bezalel.Agent.Live do
   alias Bezalel.Agent.Card
   alias Bezalel.Library
   alias Bezalel.Study.{Prompt, Tools}
+  alias Rho.Dyn.Source
   alias Rho.Loop
 
   @registry __MODULE__
@@ -42,9 +48,13 @@ defmodule Bezalel.Agent.Live do
   @spec start_link() :: {:ok, pid()} | {:error, term()}
   def start_link, do: Registry.start_link(keys: :unique, name: @registry)
 
-  @doc "The tools a loop offers."
+  @doc "The core tools the app starts rho's registry with (`Rho.Supervisor`)."
   @spec tools() :: [module()]
   def tools, do: Tools.all() ++ [Rho.Tools.ReadArtifact]
+
+  @doc "The registry's tools Study never offers: the ones that write Dyn code."
+  @spec withheld() :: [String.t()]
+  def withheld, do: Enum.map(Source.core_tools(), & &1.name())
 
   @doc """
   What a tool result keeps of its details in the session: the passage
@@ -124,7 +134,8 @@ defmodule Bezalel.Agent.Live do
           entries: entries,
           name: {:via, Registry, {@registry, conversation_id}},
           system_prompt: Prompt.system_prompt(),
-          tools: tools(),
+          tools: :registry,
+          withhold_tools: withheld(),
           keep_details: &keep_details/2
         ] ++ Application.get_env(:bezalel, __MODULE__, [])
 

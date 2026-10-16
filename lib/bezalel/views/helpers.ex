@@ -3,7 +3,7 @@ defmodule Bezalel.Views.Helpers do
 
   alias Bezalel.{Agent, Library, Models, Settings}
   alias Bezalel.Agent.Reply
-  alias Bezalel.Views.{Conversations, Images}
+  alias Bezalel.Views.{Conversations, Images, Workshop}
   alias Mob.Socket
 
   @toast_ms 4000
@@ -65,33 +65,46 @@ defmodule Bezalel.Views.Helpers do
 
   @doc """
   Switches to `tab`, loading what it shows into assigns (renders don't
-  query): the shelf, the built tools, or the on-this-phone counts.
+  query): the shelf, the built tools and how each is doing, or the
+  on-this-phone counts. Leaving a built tool's panel stops its screen.
   """
-  def go(socket, :convs), do: socket |> Socket.assign(:tab, :convs) |> Conversations.load()
+  def go(socket, tab), do: socket |> Workshop.close_panel() |> to(tab)
 
-  def go(socket, :workshop),
-    do: Socket.assign(socket, tab: :workshop, tools: Library.list_tools())
+  defp to(socket, :convs), do: socket |> Socket.assign(:tab, :convs) |> Conversations.load()
 
-  def go(socket, :settings) do
+  defp to(socket, :workshop) do
+    tools = Library.list_tools()
+
+    Socket.assign(socket,
+      tab: :workshop,
+      tools: tools,
+      tool_status: Map.new(tools, &{&1.id, Bezalel.Workshop.status(&1)})
+    )
+  end
+
+  defp to(socket, :settings) do
     Socket.assign(socket,
       tab: :settings,
       counts: %{conversations: Library.conversation_count(), tools: Library.tool_count()}
     )
   end
 
-  def go(socket, tab), do: Socket.assign(socket, :tab, tab)
+  defp to(socket, tab), do: Socket.assign(socket, :tab, tab)
 
   @doc "Reloads the visible tab's data after something changed underneath it."
   def refresh(%{assigns: %{tab: tab}} = socket) when tab in [:convs, :workshop, :settings],
-    do: go(socket, tab)
+    do: to(socket, tab)
 
   def refresh(socket), do: socket
 
-  @doc "Shows a built tool (the Workshop's tool view), or the Workshop if it's gone."
+  @doc """
+  Shows a built tool (its panel, `Bezalel.Views.Workshop.open_panel/2`), or
+  the Workshop if it's gone.
+  """
   def open_tool(socket, id) do
     case Library.get_tool(id) do
       nil -> go(socket, :workshop)
-      tool -> Socket.assign(socket, tab: :tool, tool: tool, move_open: 0)
+      tool -> Workshop.open_panel(socket, tool)
     end
   end
 
@@ -112,6 +125,7 @@ defmodule Bezalel.Views.Helpers do
         else: summaries_open(messages)
 
     socket
+    |> Workshop.close_panel()
     |> Socket.assign(
       conversation: conversation,
       messages: messages,
