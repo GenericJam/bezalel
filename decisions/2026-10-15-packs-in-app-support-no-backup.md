@@ -32,5 +32,7 @@ An upgraded iPhone moves its packs on the first start of the new build (a
 rename on one volume: instant). A pack that can't be moved stays where it
 was, is logged, and is moved at the next start. Android is unchanged
 (`android:allowBackup="false"`; same directory). Off device the packs stay
-in `Mob.data_dir()/packs`. Return mob to Hex (`~> <release>`) once a release
-includes mob#209.
+in `Mob.data_dir()/packs`. mob 0.9.21 (Hex, 2026-10-16) carries mob#209 and
+#210; Bezalel depends on `~> 0.9.21`. On an iOS native build older than
+0.9.21 the exclusion returns `{:error, :unsupported}` (mob#210), which
+`prepare/1` logs, and the app starts anyway.
