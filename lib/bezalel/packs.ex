@@ -543,9 +543,14 @@ defmodule Bezalel.Packs do
   end
 
   defp pack_status(state, name, record) do
+    # The download moves the verified file into place, then the server
+    # writes its record when the job's result arrives: until then a first
+    # install isn't done (an update keeps its old record meanwhile).
+    landing? = record == nil and match?(%{name: ^name}, state.job)
+
     installed =
       case File.stat(pack_path(state, name)) do
-        {:ok, %{type: :regular, size: size}} ->
+        {:ok, %{type: :regular, size: size}} when not landing? ->
           %{data_version: record && record["data_version"], size: size}
 
         _ ->
