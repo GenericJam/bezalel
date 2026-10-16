@@ -359,12 +359,17 @@ defmodule Bezalel.WorkshopDynTest do
     assert assigns(view).toast.text =~
              "Word Frequency crashed (3 crashes within 60 s on probation)"
 
-    # The version before runs again, and the panel says what happened.
+    # The version before runs again, the shelf shows it (the request it was
+    # built from, its generation), and the panel says what happened.
     assert %{generation: 1} = Rho.Dyn.status()
-    assert {:change_reverted, _why} = Workshop.status(Library.get_tool(tool.id))
+    shelved = Library.get_tool(tool.id)
+    assert {:change_reverted, _why} = Workshop.status(shelved)
+    assert %{description: "A word-frequency card", data: %{"generation" => 1}} = shelved
     view = render_info(view, {:tap, {:workshop, {:open_tool, tool.id}}}) |> painted()
     assert text(view) =~ "Your last change to this tool crashed while it was on probation"
     assert text(view) =~ "MOST FREQUENT WORDS"
+    assert text(view) =~ "A word-frequency card"
+    refute text(view) =~ "Call the heading Word counts"
   end
 
   test "a screen that crashes in the panel says so, and the crash counts against its generation" do
@@ -429,6 +434,97 @@ defmodule Bezalel.WorkshopDynTest do
     assert Rho.Dyn.tools() == []
     assert Library.list_tools() == []
     assert assigns(view).toast.text =~ "Removes Word Frequency"
+  end
+
+  # Approves a Remove of `tool` from its panel; it leaves the shelf.
+  defp remove!(tool) do
+    AppScreen
+    |> mount_screen()
+    |> render_info({:tap, {:workshop, {:open_tool, tool.id}}})
+    |> painted()
+    |> render_info({:tap, {:tool, :remove}})
+    |> approve()
+
+    assert :error = Rho.Dyn.lookup({:tool, tool.data["tool"]})
+    refute Enum.any?(Library.list_tools(), &(&1.id == tool.id))
+  end
+
+  test "a Remove reverted at the next boot (its launch died) puts the tool back on the shelf" do
+    [tool] = word_frequency() |> then(&Dyn.propose!(%{"word_frequency.ex" => &1})) |> approve!()
+    remove!(tool)
+
+    assert %{reverted: %{from: 2, to: 1}} = Dyn.relaunch_after_crash()
+    assert [{"word_frequency", _}] = Rho.Dyn.tools()
+    # What the app does at start (Bezalel.App.on_start).
+    :ok = Workshop.reconcile()
+
+    assert [%Tool{id: id, description: "A word-frequency card"} = back] = Library.list_tools()
+    assert id == tool.id
+    assert %{"generation" => 1, "removed" => false, "tool" => "word_frequency"} = back.data
+    assert {:removal_reverted, why} = Workshop.status(back)
+    assert why =~ "never reached stable"
+
+    view = AppScreen |> mount_screen() |> render_info({:tap, {:workshop, {:open_tool, id}}})
+    view = painted(view)
+    assert text(view) =~ "MOST FREQUENT WORDS"
+    assert text(view) =~ "Removing this tool was undone"
+  end
+
+  test "a Remove reverted on probation puts the tool back on the shelf, and the toast says so" do
+    boom = """
+    defmodule Bezalel.Dyn.Boom do
+      @behaviour Rho.Tool
+      def name, do: "boom"
+      def description, do: "Crashes."
+      def parameter_schema, do: %{"type" => "object", "properties" => %{}}
+      def run(_args, _ctx), do: raise("boom")
+      def selftest, do: :ok
+    end
+    """
+
+    tools =
+      %{"word_frequency.ex" => word_frequency(), "boom.ex" => boom}
+      |> Dyn.propose!()
+      |> approve!()
+
+    tool = Enum.find(tools, &(&1.name == "Word Frequency"))
+    remove!(tool)
+    :ok = Rho.Dyn.subscribe()
+
+    # The generation without it crashes on probation: another tool in it does.
+    script(Live, [
+      [
+        {:tool_call, "c1", "boom", %{}},
+        {:tool_call, "c2", "boom", %{}},
+        {:tool_call, "c3", "boom", %{}}
+      ],
+      [{:text, "It crashed."}]
+    ])
+
+    view = AppScreen |> mount_screen() |> ask("Crash it")
+    assert %{from: 2, to: 1} = reverted = Dyn.await(:reverted)
+    view = view |> render_info({:rho_dyn, reverted}) |> render_info({:tap, {:tab, :workshop}})
+
+    assert assigns(view).toast.text =~ "Bezalel without Word Frequency crashed"
+    back = Library.get_tool(tool.id)
+    assert %{data: %{"generation" => 1, "removed" => false}} = back
+    assert {:removal_reverted, _} = Workshop.status(back)
+    assert text(view) =~ "Back: removing it was undone"
+  end
+
+  test "a tool that runs with no shelf entry gets one; a removal that runs keeps it off" do
+    [tool] = word_frequency() |> then(&Dyn.propose!(%{"word_frequency.ex" => &1})) |> approve!()
+    :ok = Library.delete_tool(tool)
+    :ok = Workshop.reconcile()
+
+    assert [%Tool{name: "Word Frequency", description: "test change"} = back] =
+             Library.list_tools()
+
+    assert %{"module" => "Bezalel.Dyn.WordFrequency", "generation" => 1} = back.data
+
+    remove!(back)
+    :ok = Workshop.reconcile()
+    assert Library.list_tools() == []
   end
 
   test "the example in the guide the model reads passes the check, compiles and selftests" do

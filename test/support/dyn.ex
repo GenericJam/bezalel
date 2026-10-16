@@ -35,8 +35,15 @@ defmodule Bezalel.Test.Dyn do
   @spec relaunch() :: map()
   def relaunch, do: restart(Application.get_env(:rho, :dyn))
 
-  defp restart(env) do
-    _ = Keeper.mark_stable(Keeper)
+  @doc """
+  A new launch after one that died before it reached stable: Dyn's boot
+  reverts a generation on probation (boot probation).
+  """
+  @spec relaunch_after_crash() :: map()
+  def relaunch_after_crash, do: restart(Application.get_env(:rho, :dyn), false)
+
+  defp restart(env, stable \\ true) do
+    if stable, do: _ = Keeper.mark_stable(Keeper)
     :ok = Supervisor.terminate_child(Rho.Supervisor, Keeper)
     purge_all()
     Application.put_env(:rho, :dyn, env)

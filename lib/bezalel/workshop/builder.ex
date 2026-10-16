@@ -38,14 +38,18 @@ defmodule Bezalel.Workshop.Builder do
   @doc """
   Runs the build of `request` (`Bezalel.Workshop.Prompt.request/2`) on
   `model` (a `Bezalel.Models` id, rho's model spec). `on_step.(i)` fires as
-  step `i` of the live steps starts.
+  step `i` of the live steps starts. Staging starts as the generation that
+  runs, so nothing a discarded, refused or reverted build left there rides
+  along.
   """
   @spec build(String.t(), String.t(), (non_neg_integer() -> any())) :: outcome()
   def build(request, model, on_step) do
     on_step.(0)
 
-    case start(model) do
-      {:ok, loop} -> run(loop, request, on_step)
+    with :ok <- Rho.Dyn.stage_reset(),
+         {:ok, loop} <- start(model) do
+      run(loop, request, on_step)
+    else
       {:error, reason} -> {:error, "The build couldn't start: #{inspect(reason)}"}
     end
   end

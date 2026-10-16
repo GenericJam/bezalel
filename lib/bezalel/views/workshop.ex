@@ -134,6 +134,7 @@ defmodule Bezalel.Views.Workshop do
   def status_label(:missing), do: "Not running"
   def status_label({:reverted, _}), do: "Taken out: it crashed"
   def status_label({:change_reverted, _}), do: "Change undone: it crashed"
+  def status_label({:removal_reverted, _}), do: "Back: removing it was undone"
 
   # "Change the tool" names the tool the next build changes.
   defp changing(%{change_of: %{name: name}}) do
@@ -487,6 +488,11 @@ defmodule Bezalel.Views.Workshop do
       "Your last change to this tool crashed while it was on probation (#{why}), so Bezalel " <>
         "put back the version before it. That’s the one below."
 
+  def status_text({:removal_reverted, why}),
+    do:
+      "Removing this tool was undone: Bezalel without it failed on probation (#{why}), so " <>
+        "it put back the version with it. Remove it again if you still want it gone."
+
   def status_text(:safe_mode),
     do:
       "Bezalel started without your tools because two launches in a row failed. They come " <>
@@ -669,14 +675,29 @@ defmodule Bezalel.Views.Workshop do
   def host_down(_ref, _reason, socket), do: socket
 
   @doc """
-  A Dyn event (`{:rho_dyn, event}`): a revert says what crashed and puts
-  the tools back as they now are; the others refresh the statuses shown.
+  A Dyn event (`{:rho_dyn, event}`): a revert says what crashed, puts
+  the shelf in line with the generation that runs now
+  (`Bezalel.Workshop.reconcile/0`) and shows it; the others refresh the
+  statuses shown.
   """
   def dyn_event(%{type: :reverted, from: from} = event, socket) do
-    names =
-      for t <- Library.list_tools(), t.kind == "dyn", t.data["generation"] == from, do: t.name
+    {removed, changed} =
+      Library.list_tools(:all)
+      |> Enum.filter(&(&1.kind == "dyn"))
+      |> Enum.flat_map(fn t ->
+        Enum.filter(t.data["versions"] || [], &(&1["generation"] == from))
+        |> Enum.map(&{&1["removed"] == true, t.name})
+      end)
+      |> Enum.split_with(&elem(&1, 0))
 
-    who = if names == [], do: "Your latest tool change", else: Enum.join(names, ", ")
+    who =
+      case {Enum.map(changed, &elem(&1, 1)), Enum.map(removed, &elem(&1, 1))} do
+        {[], []} -> "Your latest tool change"
+        {[], gone} -> "Bezalel without " <> Enum.join(gone, ", ")
+        {names, _} -> Enum.join(names, ", ")
+      end
+
+    :ok = Bezalel.Workshop.reconcile()
 
     socket
     |> refresh_tools()
@@ -750,7 +771,8 @@ defmodule Bezalel.Views.Workshop do
   def handle(:review_approve, socket),
     do: {:noreply, Socket.assign(socket, :sheet, :approve_build)}
 
-  def handle(:approve, %{assigns: %{build: {:review, review}}} = socket) do
+  # Only from the approval sheet: the tap on it is the user's approval.
+  def handle(:approve, %{assigns: %{build: {:review, review}, sheet: :approve_build}} = socket) do
     socket = Socket.assign(socket, sheet: nil)
 
     case Workshop.approve(review) do
@@ -836,6 +858,11 @@ defmodule Bezalel.Views.Workshop do
 
     {:noreply, Helpers.open_conversation(socket, conversation)}
   end
+
+  # While a live build writes staging, a change or a removal would clobber it.
+  def handle_tool(action, %{assigns: %{build: {:step, _, true}}} = socket)
+      when action in [:change, :remove],
+      do: {:noreply, Helpers.toast(socket, "A build is running; wait for it to finish.")}
 
   # A Workshop tool's change is built on it; the sample's builds a new sample.
   def handle_tool(:change, socket) do

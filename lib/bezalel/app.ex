@@ -63,6 +63,10 @@ defmodule Bezalel.App do
       Ecto.Migrator.run(repo, migrations_dir(), :up, all: true)
     end)
 
+    # The Workshop's shelf follows the generation Dyn's boot left running
+    # (it may have reverted one whose launch died, with nobody listening).
+    :ok = Bezalel.Workshop.reconcile()
+
     Mob.Screen.start_root(Bezalel.AppScreen)
     Mob.Dist.ensure_started(node: :"bezalel_android@127.0.0.1", cookie: :mob_secret)
   end

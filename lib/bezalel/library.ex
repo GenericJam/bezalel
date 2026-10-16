@@ -388,14 +388,28 @@ defmodule Bezalel.Library do
 
   # ── Tools ─────────────────────────────────────────────────────────────────
 
-  @doc "Built tools, newest first."
-  @spec list_tools() :: [Tool.t()]
-  def list_tools, do: Repo.all(from(t in Tool, order_by: [desc: t.inserted_at, desc: t.id]))
+  @doc """
+  Built tools on the shelf, newest first; `list_tools(:all)` also those a
+  removal took off it (a Workshop tool's row stays, so a revert of the
+  removal brings it back, `Bezalel.Workshop.reconcile/0`).
+  """
+  @spec list_tools(:shelf | :all) :: [Tool.t()]
+  def list_tools(which \\ :shelf)
+  def list_tools(:shelf), do: Enum.filter(list_tools(:all), &Tool.shelved?/1)
 
-  @doc "A tool by id, or nil."
+  def list_tools(:all),
+    do: Repo.all(from(t in Tool, order_by: [desc: t.inserted_at, desc: t.id]))
+
+  @doc "A tool on the shelf by id, or nil."
   @spec get_tool(integer() | nil) :: Tool.t() | nil
   def get_tool(nil), do: nil
-  def get_tool(id), do: Repo.get(Tool, id)
+
+  def get_tool(id) do
+    case Repo.get(Tool, id) do
+      %Tool{} = tool -> if Tool.shelved?(tool), do: tool
+      nil -> nil
+    end
+  end
 
   @doc "Saves a built tool."
   @spec create_tool(map()) :: {:ok, Tool.t()} | {:error, Ecto.Changeset.t()}
@@ -412,9 +426,9 @@ defmodule Bezalel.Library do
     :ok
   end
 
-  @doc "How many tools are stored."
+  @doc "How many tools are on the shelf."
   @spec tool_count() :: non_neg_integer()
-  def tool_count, do: Repo.aggregate(Tool, :count)
+  def tool_count, do: length(list_tools())
 
   # ── First run ─────────────────────────────────────────────────────────────
 

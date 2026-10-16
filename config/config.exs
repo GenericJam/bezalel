@@ -63,9 +63,15 @@ config :rho, :dyn,
       socket: "reaches the network",
       dets: "opens files on disk",
       disk_log: "opens files on disk",
-      # Mob's native layer: under the gated Mob modules, with the device's
-      # own calls (open a URL, drive the UI, quit the app).
-      mob_nif: "is Mob's native layer (draw with Mob's UI modules)"
+      inet_tcp: "reaches the network",
+      inet6_tcp: "reaches the network",
+      inet_udp: "reaches the network",
+      prim_inet: "reaches the network",
+      prim_socket: "reaches the network",
+      inet_res: "reaches the network",
+      zip: "writes files",
+      erl_tar: "writes files"
+      # Mob's native layer, :mob_nif, is in rho's defaults.
     }
   ],
   screens: Bezalel.Workshop.Screens,

@@ -363,7 +363,10 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
   study data) and Mob's/MobBezalel's drawing modules: no network, no
   storage. A tool's screen runs in its own process in the panel
   (`Bezalel.Workshop.Host`). Without a model it's still the storyboard
-  sample. Generations live in `dyn/` under rho's data dir. Tests:
+  sample. Generations live in `dyn/` under rho's data dir; the shelf
+  (`tools` rows, one version per approved change) follows the generation
+  that runs (`Bezalel.Workshop.reconcile/0`, at app start and on every
+  revert), so a reverted change or Remove shows what runs again. Tests:
   `test/bezalel/workshop_dyn_test.exs`; tests that build tools move the
   Keeper to their own dir (`test/support/dyn.ex`). On a device, let the
   app run ten seconds after its first frame before restarting or

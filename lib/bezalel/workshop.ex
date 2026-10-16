@@ -20,8 +20,11 @@ defmodule Bezalel.Workshop do
   generation without it.
 
   The shelf (`Bezalel.Library.Tool`, kind `"dyn"`) names the tool's module,
-  tool, screen, files and the generation its last change made; the code
-  lives in the generations (`Rho.Dyn.Store`, under rho's data dir).
+  tool, screen and files, and keeps one version per approved change (the
+  request, the model, the build session and the generation it made, or a
+  removal). The row shows the version in the generation that runs, so it
+  follows the Keeper's reverts (`reconcile/0`); the code lives in the
+  generations (`Rho.Dyn.Store`, under rho's data dir).
 
   **Without a model**, a build is the design's storyboard
   (`Bezalel.Workshop.Storyboard`): the sample sermon outline for Exodus
@@ -295,8 +298,9 @@ defmodule Bezalel.Workshop do
   Activates the reviewed generation: the user just approved it on the
   approval sheet (`Rho.Dyn.Approval.Biometric.confirm/1`, then a token
   for exactly this generation). It goes on probation, and the shelf
-  follows: a new tool is added, a changed one records the generation, a
-  removed one goes. Returns the tools added or changed.
+  follows: a new tool is added, a changed one gets a version for the
+  generation, a removed one gets a removal (and leaves the shelf until a
+  revert brings it back). Returns the tools added or changed.
   """
   @spec approve(review()) :: {:ok, [Tool.t()]} | {:error, String.t()}
   def approve(%{n: n} = review) do
@@ -312,7 +316,7 @@ defmodule Bezalel.Workshop do
   end
 
   defp shelve(review) do
-    rows = Library.list_tools()
+    rows = Library.list_tools(:all)
 
     for change <- review.changes,
         tool = shelve(change, by_module(rows, change.module), review),
@@ -320,18 +324,20 @@ defmodule Bezalel.Workshop do
         do: tool
   end
 
-  defp shelve(%{change: :removed}, rows, _review) do
-    Enum.each(rows, &Library.delete_tool/1)
+  defp shelve(%{change: :removed}, rows, review) do
+    for row <- rows do
+      version = %{"generation" => review.n, "removed" => true}
+      {:ok, _} = Library.update_tool(row, %{data: show(row.data, version, %{})})
+    end
+
     nil
   end
 
   defp shelve(change, rows, review) do
-    data = %{
-      "module" => change.module,
-      "tool" => change.tool,
-      "screen" => change.screen,
-      "files" => change.files,
+    version = %{
       "generation" => review.n,
+      "description" => review.description,
+      "model" => review.model,
       "session" => review.session
     }
 
@@ -344,14 +350,16 @@ defmodule Bezalel.Workshop do
             description: review.description,
             conversation_id: review.conversation_id,
             model: review.model,
-            data: data
+            data: show(%{"module" => change.module}, version, change)
           })
 
         [row | _] ->
+          model = review.model || row.model
+
           Library.update_tool(row, %{
-            data: data,
+            data: show(row.data, %{version | "model" => model}, change),
             description: review.description,
-            model: review.model || row.model
+            model: model
           })
       end
 
@@ -361,8 +369,128 @@ defmodule Bezalel.Workshop do
     end
   end
 
+  # A row's data with `version` added and shown: its generation and
+  # session, the tool's name, screen and files from `code` (a `tools/2`
+  # entry, or `%{}` to keep them), and whether it is removed.
+  defp show(data, version, code) do
+    versions =
+      data
+      |> versions()
+      |> Enum.reject(&(&1["generation"] == version["generation"]))
+      |> Kernel.++([version])
+      |> Enum.sort_by(& &1["generation"])
+
+    data
+    |> Map.merge(%{
+      "versions" => versions,
+      "removed" => version["removed"] == true
+    })
+    |> shown(version, code)
+  end
+
+  defp shown(data, %{"removed" => true}, _code), do: data
+
+  defp shown(data, version, code) do
+    data
+    |> Map.merge(%{"generation" => version["generation"], "session" => version["session"]})
+    |> Map.merge(Map.new(Map.take(code, [:tool, :screen, :files]), fn {k, v} -> {"#{k}", v} end))
+  end
+
+  defp versions(data), do: Map.get(data, "versions", [])
+
   defp by_module(rows, module),
     do: Enum.filter(rows, &(&1.kind == "dyn" and &1.data["module"] == module))
+
+  @doc """
+  Puts the shelf in line with the generation that runs (the Keeper's
+  current one), after a revert (`Bezalel.Views.Workshop.dyn_event/2`)
+  and at app start (a launch that died reverts at the next boot, with
+  nobody listening). Each `"dyn"` row shows its version in that
+  generation's line (the generation and its ancestors): its request,
+  model, session and generation, and the tool's name, screen and files
+  as that generation has them; a row whose version there is a removal
+  leaves the shelf, and one a revert took a removal back from returns. A
+  row with no version in the line (a new tool that was reverted) stays
+  as it is, and `status/1` says why. A tool that runs with no row gets
+  one, named after its module, with the request of the generation that
+  added it.
+  """
+  @spec reconcile() :: :ok
+  def reconcile do
+    case Dyn.status() do
+      %{mode: :off} -> :ok
+      %{generation: current} -> reconcile(current)
+    end
+  end
+
+  defp reconcile(current) do
+    line = line(current)
+    in_line = MapSet.new(line, & &1.n)
+    running = Map.new(tools(hd(line), Dyn.sources(current)), &{&1.module, &1})
+    rows = for row <- Library.list_tools(:all), row.kind == "dyn", do: row
+
+    for row <- rows,
+        version = row |> versions_of() |> Enum.filter(&(&1["generation"] in in_line)),
+        version != [] do
+      follow(row, List.last(version), Map.get(running, row.data["module"], %{}))
+    end
+
+    shelved = MapSet.new(rows, & &1.data["module"])
+
+    for {module, code} <- running, not MapSet.member?(shelved, module) do
+      added = line |> Enum.reverse() |> Enum.find(&has_tool?(&1, module))
+
+      description =
+        if added.rationale in [nil, ""], do: "Built in the Workshop", else: added.rationale
+
+      version = %{"generation" => added.n, "description" => description}
+
+      {:ok, _} =
+        Library.create_tool(%{
+          name: code.title,
+          kind: "dyn",
+          description: description,
+          data: show(%{"module" => module}, version, code)
+        })
+    end
+
+    :ok
+  end
+
+  defp versions_of(%Tool{data: data}), do: versions(data)
+
+  defp follow(row, version, code) do
+    data = row.data |> Map.put("removed", version["removed"] == true) |> shown(version, code)
+
+    attrs =
+      if version["removed"],
+        do: %{data: data},
+        else: %{
+          data: data,
+          description: version["description"] || row.description,
+          model: version["model"]
+        }
+
+    if Enum.any?(attrs, fn {k, v} -> Map.get(row, k) != v end),
+      do: {:ok, _} = Library.update_tool(row, attrs)
+  end
+
+  # The generation `n` and its ancestors, newest first, down to 0.
+  defp line(n) do
+    case Dyn.generation(n) do
+      {:ok, %{parent: parent} = gen} when is_integer(parent) and parent < n ->
+        [gen | line(parent)]
+
+      {:ok, gen} ->
+        [gen]
+
+      {:error, _} ->
+        [%Rho.Dyn.Generation{n: n}]
+    end
+  end
+
+  defp has_tool?(gen, module),
+    do: Enum.any?(gen.modules, &(&1.kind == :tool and &1.module == module))
 
   @doc "Drops the reviewed generation (nothing that runs changes)."
   @spec discard(review()) :: :ok
@@ -372,20 +500,39 @@ defmodule Bezalel.Workshop do
   end
 
   @doc """
-  Removes a built tool. A Workshop tool whose code runs is removed by a
-  new generation without its files, which the user approves like any
-  other (`{:ok, {:review, review}}`); a sample, or a tool whose code no
-  longer runs (reverted), just leaves the shelf (`{:ok, :removed}`).
+  Removes a built tool. A Workshop tool in the generation that runs is
+  removed by a new generation without its files, which the user approves
+  like any other (`{:ok, {:review, review}}`); a sample, or a tool whose
+  code isn't in it (reverted), just leaves the shelf (`{:ok, :removed}`).
+  In safe mode or while its generation is rebuilt nothing is removed.
   """
   @spec remove(Tool.t()) :: {:ok, :removed} | {:ok, {:review, review()}} | {:error, String.t()}
-  def remove(%Tool{kind: "dyn", data: data} = tool) do
-    case Dyn.lookup({:tool, data["tool"]}) do
-      {:ok, _module} -> propose_removal(tool)
-      :error -> forget(tool)
+  def remove(%Tool{kind: "dyn", name: name, data: data} = tool) do
+    dyn = Dyn.status()
+
+    cond do
+      dyn.mode == :safe ->
+        {:error, "#{name} can't be removed until Bezalel starts normally with your tools."}
+
+      Dyn.rebuilding() ->
+        {:error, "#{name} can't be removed while your tools are rebuilt; try again in a moment."}
+
+      running?(dyn.generation, data["module"]) ->
+        propose_removal(tool)
+
+      true ->
+        forget(tool)
     end
   end
 
   def remove(tool), do: forget(tool)
+
+  defp running?(n, module) do
+    case Dyn.generation(n) do
+      {:ok, gen} -> has_tool?(gen, module)
+      {:error, _} -> false
+    end
+  end
 
   defp forget(tool) do
     :ok = Library.delete_tool(tool)
@@ -428,12 +575,14 @@ defmodule Bezalel.Workshop do
           | :missing
           | {:reverted, String.t()}
           | {:change_reverted, String.t()}
+          | {:removal_reverted, String.t()}
 
   @doc """
   How built `tool` is doing: the storyboard's `:sample`; a Workshop tool
-  `:probation` (its last change is on probation) or `:running`; its
+  `:probation` (the version shown is on probation) or `:running`; its
   last change reverted while an earlier version runs
-  (`{:change_reverted, why}`); reverted with no version left
+  (`{:change_reverted, why}`), or its removal reverted, so it runs again
+  (`{:removal_reverted, why}`); reverted with no version left
   (`{:reverted, why}`); `:starting` while its generation is rebuilt for a
   new app version; `:safe_mode`; or `:missing`.
   """
@@ -441,18 +590,26 @@ defmodule Bezalel.Workshop do
   def status(%Tool{kind: "dyn", data: data}) do
     gen = data["generation"]
     dyn = Dyn.status()
+    last = List.last(versions(data)) || %{"generation" => gen}
 
-    case {Dyn.lookup({:tool, data["tool"]}), reverted(gen)} do
+    case {Dyn.lookup({:tool, data["tool"]}), reverted(last["generation"])} do
       {{:ok, _}, nil} when dyn.generation == gen and dyn.status == :probation -> :probation
       {{:ok, _}, nil} -> :running
-      {{:ok, _}, why} -> {:change_reverted, why}
-      {:error, _} when dyn.mode == :safe -> :safe_mode
-      {:error, nil} -> if Dyn.rebuilding(), do: :starting, else: :missing
-      {:error, why} -> {:reverted, why}
+      {{:ok, _}, why} -> undone(last, why)
+      {:error, why} -> not_running(dyn, why)
     end
   end
 
   def status(_tool), do: :sample
+
+  # The tool runs, but its newest version was reverted.
+  defp undone(%{"removed" => true}, why), do: {:removal_reverted, why}
+  defp undone(_version, why), do: {:change_reverted, why}
+
+  # The tool doesn't run: safe mode, a rebuild, a revert, or gone.
+  defp not_running(%{mode: :safe}, _why), do: :safe_mode
+  defp not_running(_dyn, nil), do: if(Dyn.rebuilding(), do: :starting, else: :missing)
+  defp not_running(_dyn, why), do: {:reverted, why}
 
   defp reverted(n) when is_integer(n) do
     case Dyn.generation(n) do
@@ -472,6 +629,10 @@ defmodule Bezalel.Workshop do
   def describe(:not_running), do: "building tools isn't running"
   def describe(:approval_required), do: "it wasn't approved in time; approve it again"
   def describe(:not_pending), do: "it was replaced by a newer proposal"
+
+  def describe({:stale, _}),
+    do: "what runs changed since it was proposed (a revert); build it again"
+
   def describe(reason) when is_binary(reason), do: reason
   def describe(reason), do: inspect(reason, limit: 10, printable_limit: 200)
 end

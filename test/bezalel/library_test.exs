@@ -258,7 +258,9 @@ defmodule Bezalel.LibraryTest do
           "anthropic:claude-sonnet-4-5"
         ),
         "lookup_verse"
-        |> then(&Session.tool_result("c1", &1, "Exodus 31:2 …", false, [{"image/png", png}]))
+        |> then(
+          &Session.tool_result("c1", &1, "Exodus 31:2 …", false, images: [{"image/png", png}])
+        )
         |> put_in(["message", "details"], %{"title" => "Exodus 31:2", "verses" => []}),
         Session.assistant(
           %{text: "Bezalel is **filled** with the Spirit.", stop_reason: "stop"},
