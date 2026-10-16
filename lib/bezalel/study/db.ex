@@ -20,6 +20,7 @@ defmodule Bezalel.Study.DB do
   `ATTACH` on every pooled connection for the packs present at the time.
   """
 
+  alias Bezalel.Packs.Storage
   alias Exqlite.Sqlite3
 
   @packs %{
@@ -35,13 +36,15 @@ defmodule Bezalel.Study.DB do
   @type row :: %{String.t() => term()}
 
   @doc """
-  The packs directory: `config :bezalel, :study_packs_dir` when set (tests,
-  host scripts), else `packs` under the app's data dir (where the app
-  downloads them).
+  The packs directory, for `Bezalel.Packs` and the study tools alike:
+  `config :bezalel, :study_packs_dir` when set (tests, host scripts), else
+  `packs` under the app support directory (`Bezalel.Packs.Storage`, which
+  keeps it out of iCloud backup and moves the packs older builds kept in
+  Documents).
   """
   @spec dir() :: Path.t()
   def dir do
-    Application.get_env(:bezalel, :study_packs_dir) || Path.join(Mob.data_dir(), "packs")
+    Application.get_env(:bezalel, :study_packs_dir) || Path.join(Storage.root(), "packs")
   end
 
   @doc "The file of `pack`."

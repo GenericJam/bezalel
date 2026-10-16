@@ -25,8 +25,13 @@ defmodule Bezalel.MixProject do
   defp deps do
     [
       # 0.9.18+: the light/dark watcher follows the OS (MOB-479) and
-      # <Scroll anchor="bottom"> renders on iOS (MOB-481).
-      {:mob, "~> 0.9.18"},
+      # <Scroll anchor="bottom"> renders on iOS (MOB-481). Pinned to a mob
+      # commit for Mob.Storage.exclude_from_backup/1 (GenericJam/mob#209,
+      # bezalel-lac.3) until a release carries it; then back to
+      # `{:mob, "~> <that version>"}`. mob_dev builds the native app from
+      # deps/mob (mob.exs), so a git dep reaches the iOS/Android sources too.
+      {:mob,
+       github: "GenericJam/mob", ref: "f327d751ab90109da0de516729b352f0561ac6dc", override: true},
       # 0.7.25+: bundles a style package's fonts (mob_bezalel's) in dev and
       # release builds (MOB-476, MOB-480).
       {:mob_dev, "~> 0.7.25", only: :dev, runtime: false},

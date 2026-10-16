@@ -4,6 +4,7 @@ defmodule Bezalel.App do
   use Mob.App
 
   alias Bezalel.Agent.Live
+  alias Bezalel.Packs.Storage
 
   @impl Mob.App
   def navigation(_platform) do
@@ -42,6 +43,9 @@ defmodule Bezalel.App do
     {:ok, _} = Live.start_link()
     # The study library: fetches the pack list on first launch, resumes a
     # download the app was stopped in, and runs downloads outside the screen.
+    # First its directory: out of iCloud backup, with what older builds
+    # left in Documents moved in (Bezalel.Packs.Storage).
+    :ok = Storage.prepare()
     {:ok, _} = Bezalel.Packs.start_link()
 
     {:ok, _} = Application.ensure_all_started(:ecto_sqlite3)

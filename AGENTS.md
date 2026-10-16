@@ -132,7 +132,10 @@ Things that already bit this app. Not optional.
    Before MOB-487 FTS5 was missing on device: a host test passing proves
    nothing about a SQLite feature on the phone.
 6. **On iOS `Mob.data_dir()` is Documents, which iCloud backs up.** Never put
-   re-downloadable data there (Apple rejects it); see `bezalel-lac.3`.
+   re-downloadable data there (Apple rejects it). The packs live in
+   `Mob.Storage.dir(:app_support)/packs`, excluded from backup at every start
+   (`Bezalel.Packs.Storage`, `bezalel-lac.3`); do the same for any other
+   downloaded data.
 7. **A native reinstall clears the app's data**, packs included.
 8. **Default arguments evaluate eagerly** (from mob): `System.get_env("X",
    Path.expand("~/…"))` calls `System.user_home!()` every time, which raises
@@ -351,7 +354,11 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
 - **The study library** (`Bezalel.Packs`, `Bezalel.Views.StudyLibrary`):
   the packs are downloaded from
   https://bezalel.genericjam.com/packs/manifest.json (`data/README.md`,
-  "Publish") into `Mob.data_dir()/packs`, where the tools read them. On
+  "Publish") into `packs` under the app support directory (iOS
+  `Library/Application Support/packs`, excluded from iCloud backup; Android
+  `files/packs`), where the tools read them; `Bezalel.Study.DB.dir/0` names
+  it, and `Bezalel.Packs.Storage` moves what older builds left in
+  `Documents/packs` at startup. On
   first launch a sheet offers the core pack (26 MB download, 182 MB on the
   phone); Settings → Study library downloads, updates ("Check for
   updates") and removes packs, shows storage used, and opens Sources and
@@ -372,10 +379,10 @@ loading with `start_async/3` / `handle_async/3`), `components`, `events`,
     version not checked; "Check for updates" hashes it and keeps it if it
     matches the published one.
     - Android (debug build): `adb -s <serial> push data/out/core.sqlite /data/local/tmp/ && adb -s <serial> shell "run-as com.example.bezalel mkdir -p files/packs && run-as com.example.bezalel cp /data/local/tmp/core.sqlite files/packs/ && rm /data/local/tmp/core.sqlite"`
-    - iOS simulator: `d=$(xcrun simctl get_app_container <udid> com.example.bezalel data) && mkdir -p "$d/Documents/packs" && cp data/out/core.sqlite "$d/Documents/packs/"`
-      (check `Mob.data_dir()` on the node if the app's data dir differs)
+    - iOS simulator: `d=$(xcrun simctl get_app_container <udid> com.example.bezalel data) && mkdir -p "$d/Library/Application Support/packs" && cp data/out/core.sqlite "$d/Library/Application Support/packs/"`
+      (check `Bezalel.Study.DB.dir()` on the node if it differs)
     - Remove: Settings → Remove for the optional packs; or
-      `run-as com.example.bezalel rm -r files/packs` / `rm -r "$d/Documents/packs"`
+      `run-as com.example.bezalel rm -r files/packs` / `rm -r "$d/Library/Application Support/packs"`
       (core can only be removed this way).
   A native redeploy that reinstalls the app clears its data, packs included.
   Without a pack the tools return an error naming it; the model sees it and
